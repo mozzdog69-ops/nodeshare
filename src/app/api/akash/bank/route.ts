@@ -1,11 +1,10 @@
+import {
+  AKASH_FETCH_HEADERS,
+  DEFAULT_AKASH_LCD_BASES,
+} from "@/lib/akash/lcd-endpoints";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_LCDS = [
-  "https://rest.akashnet.net",
-  "https://akash-api.lavenderfive.com:443",
-];
 
 function isAkashAddr(a: string) {
   return /^akash1[a-z0-9]{38}$/.test(a);
@@ -15,7 +14,9 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const address = (searchParams.get("address") ?? "").trim();
   const bases = (
-    process.env.AKASH_LCD_URL ? [process.env.AKASH_LCD_URL] : DEFAULT_LCDS
+    process.env.AKASH_LCD_URL
+      ? [process.env.AKASH_LCD_URL.trim()]
+      : [...DEFAULT_AKASH_LCD_BASES]
   ).map((b) => b.replace(/\/$/, ""));
 
   if (!isAkashAddr(address)) {
@@ -35,11 +36,11 @@ export async function GET(req: Request) {
     const url = `${base}/cosmos/bank/v1beta1/balances/${address}`;
     try {
       const res = await fetch(url, {
-        headers: { Accept: "application/json" },
+        headers: AKASH_FETCH_HEADERS,
         next: { revalidate: 30 },
       });
       if (!res.ok) {
-        lastErr = `${url} → ${res.status}`;
+        lastErr = `${base} → ${res.status}`;
         continue;
       }
       const json = (await res.json()) as {
@@ -66,7 +67,11 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json(
-    { ok: false, error: lastErr, data: null },
+    {
+      ok: false,
+      error: `${lastErr} — tried multiple LCDs; override with AKASH_LCD_URL if needed.`,
+      data: null,
+    },
     { status: 502 },
   );
 }

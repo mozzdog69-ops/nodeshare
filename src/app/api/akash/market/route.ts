@@ -1,21 +1,41 @@
+import {
+  AKASH_FETCH_HEADERS,
+  DEFAULT_AKASH_LCD_BASES,
+} from "@/lib/akash/lcd-endpoints";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** Prefer REST endpoints that implement market v1beta4; publicnode often 501 on beta3. */
-const DEFAULT_LCDS = [
-  "https://rest.akashnet.net",
-  "https://akash-api.lavenderfive.com:443",
-  "https://akash-rest.publicnode.com",
-];
-
 const FETCH_OPTS: RequestInit = {
-  headers: {
-    Accept: "application/json",
-    "User-Agent": "NodeShare/1.0 (+https://github.com/mozzdog69-ops/nodeshare)",
-  },
+  headers: AKASH_FETCH_HEADERS,
   next: { revalidate: 15 },
 };
+
+function tryOrdersJson(json: unknown): unknown[] {
+  if (!json || typeof json !== "object") return [];
+  const o = json as Record<string, unknown>;
+  const orders = o.orders ?? o.order;
+  return Array.isArray(orders) ? orders : [];
+}
+
+/** Try one GET; returns orders + url on 200 + parseable body. */
+async function fetchOrdersFrom(
+  base: string,
+  apiVer: "v1beta4" | "v1beta3",
+  limit: number,
+): Promise<{ orders: unknown[]; source: string } | null> {
+  const path = `/akash/market/${apiVer}/orders?pagination.limit=${limit}`;
+  const url = `${base}${path}`;
+  try {
+    const res = await fetch(url, FETCH_OPTS);
+    if (!res.ok) return null;
+    const json = (await res.json()) as unknown;
+    const orders = tryOrdersJson(json);
+    return { orders, source: url };
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -25,46 +45,37 @@ export async function GET(req: Request) {
   );
 
   const bases = (
-    process.env.AKASH_LCD_URL ? [process.env.AKASH_LCD_URL] : DEFAULT_LCDS
+    process.env.AKASH_LCD_URL
+      ? [process.env.AKASH_LCD_URL.trim()]
+      : [...DEFAULT_AKASH_LCD_BASES]
   ).map((b) => b.replace(/\/$/, ""));
 
-  /** Prefer v1beta4 (newer LCDs); fall back to v1beta3 only if needed. */
-  const paths = [
-    `/akash/market/v1beta4/orders?pagination.limit=${limit}`,
-    `/akash/market/v1beta3/orders?pagination.limit=${limit}`,
-  ];
-
-  let lastErr = "No LCD reachable";
-
-  for (const base of bases) {
-    for (const path of paths) {
-      try {
-        const url = `${base}${path}`;
-        const res = await fetch(url, FETCH_OPTS);
-        if (!res.ok) {
-          lastErr = `${url} → ${res.status}`;
-          continue;
-        }
-        const json = (await res.json()) as {
-          orders?: unknown[];
-          pagination?: { next_key?: string };
-        };
-        const orders = json.orders ?? (json as { order?: unknown[] }).order ?? [];
+  /**
+   * Prefer v1beta4 everywhere first (publicnode-style mirrors often 501 on beta3).
+   * Then retry all bases with v1beta3.
+   */
+  for (const ver of ["v1beta4", "v1beta3"] as const) {
+    for (const base of bases) {
+      const got = await fetchOrdersFrom(base, ver, limit);
+      if (got) {
         return NextResponse.json({
           ok: true,
           data: {
-            source: url,
-            orders: Array.isArray(orders) ? orders : [],
+            source: got.source,
+            orders: got.orders,
           },
         });
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e);
       }
     }
   }
 
   return NextResponse.json(
-    { ok: false, error: lastErr, data: { orders: [] } },
+    {
+      ok: false,
+      error:
+        "No Akash LCD returned market orders (tried v1beta4 then v1beta3 on multiple REST nodes). Set AKASH_LCD_URL to a REST base you trust.",
+      data: { orders: [] },
+    },
     { status: 502 },
   );
 }

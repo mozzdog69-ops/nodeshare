@@ -21,42 +21,61 @@ type EtherscanJson = {
   result: EtherscanTx[] | string;
 };
 
-async function fetchTokentx(url: URL): Promise<EtherscanTx[] | null> {
-  const res = await fetch(url.toString(), { next: { revalidate: 30 } });
-  const json = (await res.json()) as EtherscanJson;
-
-  if (json.status === "1" && Array.isArray(json.result)) {
-    return json.result;
+function parseTokentx(json: EtherscanJson):
+  | { ok: true; rows: EtherscanTx[] }
+  | { ok: false; detail: string } {
+  if (json.status === "1") {
+    if (Array.isArray(json.result)) {
+      return { ok: true, rows: json.result };
+    }
+    if (json.result === "") {
+      return { ok: true, rows: [] };
+    }
   }
 
+  const r = json.result;
+  const combined = `${json.message ?? ""} ${typeof r === "string" ? r : ""}`.toLowerCase();
   if (
     json.status === "0" &&
-    typeof json.result === "string" &&
-    (json.result.toLowerCase().includes("no transactions") ||
-      json.result.toLowerCase().includes("no record") ||
-      json.message?.toLowerCase().includes("no transactions"))
+    /no transactions|no records|no token/i.test(combined)
   ) {
-    return [];
+    return { ok: true, rows: [] };
   }
 
-  if (json.status === "1" && json.result === "") {
-    return [];
-  }
+  const detail =
+    typeof r === "string" && r.length > 0
+      ? `${json.message ?? "NOTOK"}: ${r}`
+      : json.message || "Unexpected Etherscan response";
+  return { ok: false, detail };
+}
 
-  return null;
+async function fetchTokentx(url: URL): Promise<
+  | { ok: true; rows: EtherscanTx[] }
+  | { ok: false; detail: string }
+> {
+  const res = await fetch(url.toString(), {
+    next: { revalidate: 30 },
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    return { ok: false, detail: `HTTP ${res.status} from Etherscan` };
+  }
+  const json = (await res.json()) as EtherscanJson;
+  return parseTokentx(json);
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const raw = searchParams.get("address") ?? "";
-  const key = process.env.ETHERSCAN_API_KEY;
+  const apiKey = process.env.ETHERSCAN_API_KEY?.trim() ?? "";
   const chainId = getChainId();
 
-  if (!key) {
+  if (!apiKey || apiKey === "YOUR_ETHERSCAN_KEY") {
     return NextResponse.json(
       {
         ok: false,
-        error: "ETHERSCAN_API_KEY is not set (needed for token transfer history)",
+        error:
+          "ETHERSCAN_API_KEY is missing or still a placeholder — add a key from etherscan.io/myapikey (Vercel → Env → Redeploy).",
         data: { transfers: [] as unknown[] },
       },
       { status: 503 },
@@ -73,29 +92,25 @@ export async function GET(req: Request) {
     );
   }
 
-  /** Etherscan accepts lowercase hex for tokentx. */
   const addrParam = address.toLowerCase();
-
-  const apiKey = key;
   const usdc = getUsdcAddress().toLowerCase();
   const usdt = getUsdtAddress().toLowerCase();
 
-  /** Classic v1 API — most reliable for Ethereum mainnet ERC-20 history. */
-  async function tryV1Mainnet(): Promise<EtherscanTx[] | null> {
-    if (chainId !== 1) return null;
+  function buildV1(): URL {
     const url = new URL("https://api.etherscan.io/api");
     url.searchParams.set("module", "account");
     url.searchParams.set("action", "tokentx");
     url.searchParams.set("address", addrParam);
     url.searchParams.set("page", "1");
     url.searchParams.set("offset", "40");
+    url.searchParams.set("startblock", "0");
+    url.searchParams.set("endblock", "99999999");
     url.searchParams.set("sort", "desc");
     url.searchParams.set("apikey", apiKey);
-    return fetchTokentx(url);
+    return url;
   }
 
-  /** Multi-chain v2 — try after v1 when chain id is supported by your key. */
-  async function tryV2(): Promise<EtherscanTx[] | null> {
+  function buildV2(): URL {
     const url = new URL("https://api.etherscan.io/v2/api");
     url.searchParams.set("chainid", String(chainId));
     url.searchParams.set("module", "account");
@@ -103,24 +118,44 @@ export async function GET(req: Request) {
     url.searchParams.set("address", addrParam);
     url.searchParams.set("page", "1");
     url.searchParams.set("offset", "40");
+    url.searchParams.set("startblock", "0");
+    url.searchParams.set("endblock", "99999999");
     url.searchParams.set("sort", "desc");
     url.searchParams.set("apikey", apiKey);
-    return fetchTokentx(url);
+    return url;
   }
 
   try {
-    const list = (await tryV1Mainnet()) ?? (await tryV2());
+    const errors: string[] = [];
+    let rows: EtherscanTx[] | null = null;
 
-    if (!list) {
+    if (chainId === 1) {
+      const v1 = await fetchTokentx(buildV1());
+      if (v1.ok) {
+        rows = v1.rows;
+      } else {
+        errors.push(`v1: ${v1.detail}`);
+      }
+    }
+
+    if (rows === null) {
+      const v2 = await fetchTokentx(buildV2());
+      if (v2.ok) {
+        rows = v2.rows;
+      } else {
+        errors.push(`v2: ${v2.detail}`);
+      }
+    }
+
+    if (rows === null) {
       return NextResponse.json({
         ok: false,
-        error:
-          "Etherscan did not return token transfers (check API key / chain). Ensure your key allows Ethereum mainnet API Pro / V2 if using chainid≠1.",
+        error: `${errors.join(" · ")} — Check the key at etherscan.io; free tier has rate limits. No spaces in ETHERSCAN_API_KEY.`,
         data: { transfers: [] },
       });
     }
 
-    const filtered = list.filter((t) => {
+    const filtered = rows.filter((t) => {
       const c = t.contractAddress?.toLowerCase();
       return c === usdc || c === usdt;
     });
