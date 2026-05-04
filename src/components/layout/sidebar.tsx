@@ -16,7 +16,6 @@ function shortAddr(a: string | null) {
 
 const items = [
   { href: "/app/dashboard", label: "Dashboard" },
-  { href: "/app/run-job", label: "Run Job" },
   { href: "/app/marketplace", label: "Marketplace" },
   { href: "/app/terminal", label: "Terminal" },
   { href: "/app/wallet", label: "Wallet" },

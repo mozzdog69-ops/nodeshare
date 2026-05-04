@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ComputeOffersGrid } from "@/components/marketplace/compute-offers-grid";
+import { LiveAkashOffers } from "@/components/marketplace/live-akash-offers";
 
 export function OffersSection() {
   return (
@@ -17,8 +17,8 @@ export function OffersSection() {
               Spot capacity on the mesh
             </h2>
             <p className="mt-2 max-w-xl text-sm text-text-secondary">
-              Browse spot GPUs — after you unlock, reserve from Run job or the
-              Marketplace tab in the console.
+              Browse live Akash bids — after you unlock, reserve from the Marketplace and
+              attach workloads in the terminal.
             </p>
           </div>
           <Button variant="secondary" asChild>
@@ -27,7 +27,7 @@ export function OffersSection() {
         </div>
 
         <div className="mt-10">
-          <ComputeOffersGrid reserveHref="/login" reserveLabel="Unlock to reserve" />
+          <LiveAkashOffers reserveHref="/login" reserveLabel="Unlock to reserve" limit={6} />
         </div>
       </div>
     </section>

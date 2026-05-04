@@ -44,6 +44,8 @@ export function LiveWalletPanel() {
   const { ethAddress, identity } = useWalletSession();
   const [balances, setBalances] = useState<BalancesPayload | null>(null);
   const [balErr, setBalErr] = useState<string | null>(null);
+  const [aktBal, setAktBal] = useState<string | null>(null);
+  const [aktErr, setAktErr] = useState<string | null>(null);
   const [txs, setTxs] = useState<TransferRow[]>([]);
   const [txErr, setTxErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -52,6 +54,7 @@ export function LiveWalletPanel() {
     if (!ethAddress) return;
     setBalErr(null);
     setTxErr(null);
+    setAktErr(null);
     const [bRes, tRes] = await Promise.all([
       fetch(
         apiUrl(
@@ -82,7 +85,28 @@ export function LiveWalletPanel() {
       setTxs([]);
       setTxErr(tJson.error ?? null);
     }
-  }, [ethAddress]);
+
+    if (identity?.aktAddress) {
+      const aRes = await fetch(
+        apiUrl(
+          `/api/akash/bank?address=${encodeURIComponent(identity.aktAddress)}`,
+        ),
+      );
+      const aJson = (await aRes.json()) as {
+        ok: boolean;
+        data?: { aktFormatted?: string };
+        error?: string;
+      };
+      if (aJson.ok && aJson.data?.aktFormatted != null) {
+        setAktBal(aJson.data.aktFormatted);
+      } else {
+        setAktBal(null);
+        setAktErr(aJson.error ?? "Could not load AKT");
+      }
+    } else {
+      setAktBal(null);
+    }
+  }, [ethAddress, identity?.aktAddress]);
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0);
@@ -118,7 +142,7 @@ export function LiveWalletPanel() {
           {balErr ? (
             <p className="text-sm text-amber-800">{balErr}</p>
           ) : balances ? (
-            <dl className="grid gap-3 sm:grid-cols-3">
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border border-border-subtle bg-surface-base px-3 py-2">
                 <dt className="text-xs text-text-muted">ETH (gas)</dt>
                 <dd className="font-mono text-lg font-semibold tabular-nums">
@@ -142,6 +166,23 @@ export function LiveWalletPanel() {
                     maximumFractionDigits: 2,
                   })}
                 </dd>
+              </div>
+              <div className="rounded-lg border border-border-subtle bg-surface-base px-3 py-2">
+                <dt className="text-xs text-text-muted">AKT (Akash)</dt>
+                <dd className="font-mono text-lg font-semibold tabular-nums">
+                  {aktErr ? (
+                    <span className="text-xs text-amber-800">{aktErr}</span>
+                  ) : aktBal != null ? (
+                    aktBal
+                  ) : (
+                    "…"
+                  )}
+                </dd>
+                {identity?.aktAddress ? (
+                  <dd className="mt-1 font-mono text-[10px] text-text-muted break-all">
+                    {identity.aktAddress}
+                  </dd>
+                ) : null}
               </div>
             </dl>
           ) : (

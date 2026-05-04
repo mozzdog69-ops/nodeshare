@@ -1,13 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { apiUrl } from "@/lib/api-base";
+import { useWalletSession } from "@/context/wallet-session";
+import { useCallback, useEffect, useState } from "react";
 
-const events = [
-  { id: 1, text: "GPU node joined network", tone: "success" as const },
-  { id: 2, text: "Job #4821 completed · $0.42", tone: "neutral" as const },
-  { id: 3, text: "Swap USDC → AKT confirmed", tone: "neutral" as const },
-  { id: 4, text: "Queue: 2 jobs ahead of you", tone: "warning" as const },
-];
+type Ev = { id: string; text: string; tone: "success" | "warning" | "neutral" };
 
 const toneClass = {
   success: "text-success",
@@ -16,11 +14,101 @@ const toneClass = {
 };
 
 export function ActivityFeed() {
+  const { ethAddress } = useWalletSession();
+  const [events, setEvents] = useState<Ev[]>([]);
+
+  const load = useCallback(async () => {
+    const [mRes, tRes] = await Promise.all([
+      fetch(apiUrl("/api/akash/market?limit=12")),
+      ethAddress
+        ? fetch(
+            apiUrl(
+              `/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`,
+            ),
+          )
+        : Promise.resolve(null as Response | null),
+    ]);
+
+    const next: Ev[] = [];
+
+    const mj = (await mRes.json()) as {
+      ok: boolean;
+      data?: { orders?: unknown[]; source?: string };
+      error?: string;
+    };
+    if (mj.ok && mj.data?.orders?.length) {
+      next.push({
+        id: "akash",
+        text: `Akash mesh: ${mj.data.orders.length} open bids (sampled)`,
+        tone: "success",
+      });
+      if (mj.data.source) {
+        next.push({
+          id: "lcd",
+          text: `LCD ${mj.data.source.replace(/^https?:\/\//, "").split("/")[0]}`,
+          tone: "neutral",
+        });
+      }
+    } else {
+      next.push({
+        id: "akash-fail",
+        text: mj.error
+          ? `Akash market: ${mj.error}`
+          : "Akash market: no orders returned",
+        tone: "warning",
+      });
+    }
+
+    if (tRes) {
+      const tj = (await tRes.json()) as {
+        ok: boolean;
+        data?: { transfers?: { hash: string; symbol: string; timestamp: number }[] };
+      };
+      const tr = tj.data?.transfers?.[0];
+      if (tj.ok && tr) {
+        next.push({
+          id: `tx-${tr.hash}`,
+          text: `Latest ${tr.symbol}: ${new Date(tr.timestamp).toLocaleString()}`,
+          tone: "neutral",
+        });
+      } else if (!tj.ok) {
+        next.push({
+          id: "tx-fail",
+          text: "Stablecoin tx feed needs ETHERSCAN_API_KEY + wallet",
+          tone: "warning",
+        });
+      }
+    } else {
+      next.push({
+        id: "unlock",
+        text: "Unlock wallet to stream your USDC/USDT activity here",
+        tone: "neutral",
+      });
+    }
+
+    setEvents(next.slice(0, 6));
+  }, [ethAddress]);
+
+  useEffect(() => {
+    void load();
+    const id = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(id);
+  }, [load]);
+
   return (
     <div>
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
-        Live activity
-      </h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+          Live activity
+        </h3>
+        <button
+          type="button"
+          className="text-xs font-medium text-accent hover:underline"
+          onClick={() => void load()}
+        >
+          Refresh
+        </button>
+      </div>
       <ul className="space-y-2">
         {events.map((e, i) => (
           <motion.li

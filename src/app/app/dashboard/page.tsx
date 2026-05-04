@@ -1,7 +1,7 @@
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardLiveBalances } from "@/components/dashboard/dashboard-live-balances";
+import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
 import { LiveOpsPanel } from "@/components/dashboard/live-ops-panel";
-import { StatRow } from "@/components/dashboard/stat-row";
 import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -16,7 +16,7 @@ export default function DashboardPage() {
       <header className="flex h-14 items-center justify-between border-b border-border-subtle bg-surface-elevated/80 px-6 backdrop-blur-md">
         <h1 className="text-sm font-semibold text-text-primary">Dashboard</h1>
         <span className="rounded-full border border-success-muted bg-success-muted px-3 py-1 text-xs font-medium text-success">
-          Network healthy
+          Mesh live (LCD)
         </span>
       </header>
       <div className="flex-1 space-y-8 p-6">
@@ -27,13 +27,7 @@ export default function DashboardPage() {
           <DashboardLiveBalances />
         </section>
 
-        <StatRow
-          stats={[
-            { label: "Active jobs", value: "2", hint: "1 training · 1 inference" },
-            { label: "GPU hours (30d)", value: "128.4", hint: "Across Akash + Render" },
-            { label: "Nodes online", value: "128", hint: "Decentralized mesh" },
-          ]}
-        />
+        <DashboardLiveStats />
 
         <div className="flex flex-col items-stretch justify-between gap-6 rounded-[var(--radius-lg)] border border-dashed border-accent/25 bg-gradient-to-br from-accent-muted/50 to-transparent p-8 sm:flex-row sm:items-center">
           <div>
@@ -41,14 +35,15 @@ export default function DashboardPage() {
               Next action
             </p>
             <p className="mt-1 text-lg font-semibold tracking-tight text-text-primary">
-              Launch a compute job
+              Reserve spot GPUs
             </p>
             <p className="mt-1 max-w-md text-sm text-text-secondary">
-              Reserve GPUs, lock payment in escrow, stream logs from the mesh.
+              Browse live Akash bids in the Marketplace, fund your wallet, then open the
+              terminal once balances clear the gate.
             </p>
           </div>
           <Button className="shrink-0 px-8 py-4 text-base shadow-lg" asChild>
-            <Link href="/app/run-job">Launch compute job</Link>
+            <Link href="/app/marketplace">Open marketplace</Link>
           </Button>
         </div>
 
@@ -66,8 +61,7 @@ export default function DashboardPage() {
               Terminal
             </h3>
             <p className="mt-2 text-sm text-text-secondary">
-              The core experience — dark island inside a light console. Full GPU
-              control from a shell you trust.
+              Balance-gated shell — fund ETH or USDC/USDT, then stream logs from the mesh.
             </p>
             <Button variant="secondary" className="mt-4" asChild>
               <Link href="/app/terminal">Open terminal</Link>

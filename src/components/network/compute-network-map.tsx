@@ -1,65 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-
-type Pop = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  latency: string;
-  cost: string;
-  gpu: string;
-  provider: "Akash" | "Render" | "Hybrid";
-};
-
-const pops: Pop[] = [
-  {
-    id: "nyc",
-    label: "US-East",
-    x: 26,
-    y: 38,
-    latency: "18 ms",
-    cost: "$0.42/hr",
-    gpu: "RTX 4090",
-    provider: "Akash",
-  },
-  {
-    id: "fra",
-    label: "EU-Central",
-    x: 52,
-    y: 34,
-    latency: "42 ms",
-    cost: "$0.38/hr",
-    gpu: "A100 40G",
-    provider: "Akash",
-  },
-  {
-    id: "sgp",
-    label: "AP-South",
-    x: 76,
-    y: 52,
-    latency: "61 ms",
-    cost: "$0.51/hr",
-    gpu: "L40S",
-    provider: "Render",
-  },
-  {
-    id: "sfo",
-    label: "US-West",
-    x: 14,
-    y: 42,
-    latency: "24 ms",
-    cost: "$0.45/hr",
-    gpu: "A10",
-    provider: "Hybrid",
-  },
-];
+import { apiUrl } from "@/lib/api-base";
+import { ordersToMapNodes, type MapNode } from "@/lib/akash/summarize";
 
 export function ComputeNetworkMap() {
-  const [selected, setSelected] = useState<Pop | null>(null);
+  const [nodes, setNodes] = useState<MapNode[]>([]);
+  const [selected, setSelected] = useState<MapNode | null>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
   const curves = useMemo(
     () => [
       "M 20 45 Q 40 28 55 38",
@@ -68,6 +20,29 @@ export function ComputeNetworkMap() {
     ],
     [],
   );
+
+  const load = useCallback(async () => {
+    setErr(null);
+    const res = await fetch(apiUrl("/api/akash/market?limit=24"));
+    const j = (await res.json()) as {
+      ok: boolean;
+      data?: { orders: unknown[]; source?: string };
+      error?: string;
+    };
+    if (!j.ok || !j.data?.orders?.length) {
+      setNodes([]);
+      setSource(null);
+      setErr(j.error ?? "Akash LCD unreachable");
+      return;
+    }
+    setSource(j.data.source ?? null);
+    setNodes(ordersToMapNodes(j.data.orders));
+    setSelected(null);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <div className="relative overflow-hidden rounded-[var(--radius-lg)] border border-border-subtle bg-surface-elevated shadow-card">
@@ -109,47 +84,69 @@ export function ComputeNetworkMap() {
               />
             ))}
           </svg>
-          {pops.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => setSelected(n)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
-              style={{ left: `${n.x}%`, top: `${n.y}%` }}
-            >
-              <span className="relative flex h-4 w-4 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/35 opacity-60" />
-                <span
-                  className={cn(
-                    "relative inline-flex h-3 w-3 rounded-full shadow-[0_0_12px_rgba(225,29,72,0.55)]",
-                    selected?.id === n.id
-                      ? "bg-accent ring-2 ring-white"
-                      : "bg-accent/90",
-                  )}
-                />
-              </span>
-            </button>
-          ))}
+          {err ? (
+            <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+              <p className="max-w-sm text-sm text-amber-800">
+                {err}{" "}
+                <button
+                  type="button"
+                  className="font-medium text-accent underline"
+                  onClick={() => void load()}
+                >
+                  Retry
+                </button>
+              </p>
+            </div>
+          ) : (
+            nodes.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => setSelected(n)}
+                className="absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+                style={{ left: `${n.x}%`, top: `${n.y}%` }}
+              >
+                <span className="relative flex h-4 w-4 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/35 opacity-60" />
+                  <span
+                    className={cn(
+                      "relative inline-flex h-3 w-3 rounded-full shadow-[0_0_12px_rgba(225,29,72,0.55)]",
+                      selected?.id === n.id
+                        ? "bg-accent ring-2 ring-white"
+                        : "bg-accent/90",
+                    )}
+                  />
+                </span>
+              </button>
+            ))
+          )}
         </div>
         <aside className="border-t border-border-subtle bg-surface-base/50 p-5 lg:border-l lg:border-t-0">
           <h3 className="text-sm font-semibold text-text-primary">Node detail</h3>
+          {source ? (
+            <p className="mt-1 font-mono text-[10px] text-text-muted break-all">
+              LCD: {source}
+            </p>
+          ) : null}
           {selected ? (
             <dl className="mt-4 space-y-3 text-sm">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-text-muted">
-                  Region
+                  Order id
                 </dt>
-                <dd className="font-medium text-text-primary">{selected.label}</dd>
+                <dd className="font-mono text-xs font-medium text-text-primary break-all">
+                  {selected.id}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-text-muted">
-                  Latency
+                  Latency (est.)
                 </dt>
                 <dd className="font-mono tabular-nums">{selected.latency}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-text-muted">
-                  Spot price
+                  Bid price
                 </dt>
                 <dd className="font-mono font-semibold text-accent">
                   {selected.cost}
@@ -157,20 +154,21 @@ export function ComputeNetworkMap() {
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-text-muted">
-                  GPU
+                  Resources (hint)
                 </dt>
                 <dd>{selected.gpu}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-text-muted">
-                  Provider
+                  Layer
                 </dt>
                 <dd>{selected.provider}</dd>
               </div>
             </dl>
           ) : (
             <p className="mt-3 text-sm text-text-secondary">
-              Select a glowing node to inspect latency, cost, and GPU type.
+              Select a glowing node to inspect bid price and resource hints from live
+              Akash orders.
             </p>
           )}
         </aside>

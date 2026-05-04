@@ -2,12 +2,20 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** Public LCDs — first that responds wins (no API key for read-only market data). */
+/** Prefer REST endpoints that implement market v1beta4; publicnode often 501 on beta3. */
 const DEFAULT_LCDS = [
   "https://rest.akashnet.net",
   "https://akash-api.lavenderfive.com:443",
   "https://akash-rest.publicnode.com",
 ];
+
+const FETCH_OPTS: RequestInit = {
+  headers: {
+    Accept: "application/json",
+    "User-Agent": "NodeShare/1.0 (+https://github.com/mozzdog69-ops/nodeshare)",
+  },
+  next: { revalidate: 15 },
+};
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -20,6 +28,7 @@ export async function GET(req: Request) {
     process.env.AKASH_LCD_URL ? [process.env.AKASH_LCD_URL] : DEFAULT_LCDS
   ).map((b) => b.replace(/\/$/, ""));
 
+  /** Prefer v1beta4 (newer LCDs); fall back to v1beta3 only if needed. */
   const paths = [
     `/akash/market/v1beta4/orders?pagination.limit=${limit}`,
     `/akash/market/v1beta3/orders?pagination.limit=${limit}`,
@@ -31,10 +40,7 @@ export async function GET(req: Request) {
     for (const path of paths) {
       try {
         const url = `${base}${path}`;
-        const res = await fetch(url, {
-          headers: { Accept: "application/json" },
-          next: { revalidate: 15 },
-        });
+        const res = await fetch(url, FETCH_OPTS);
         if (!res.ok) {
           lastErr = `${url} → ${res.status}`;
           continue;
