@@ -1,6 +1,7 @@
 "use client";
 
 import { NodeShareLogo } from "@/components/brand/nodeshare-logo";
+import { APP_NAV_ITEMS } from "@/components/layout/nav-config";
 import { useWalletSession } from "@/context/wallet-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -14,29 +15,19 @@ function shortAddr(a: string | null) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-const items = [
-  { href: "/app/dashboard", label: "Dashboard" },
-  { href: "/app/marketplace", label: "Marketplace" },
-  { href: "/app/terminal", label: "Terminal" },
-  { href: "/app/wallet", label: "Wallet" },
-  { href: "/app/network", label: "Compute Nodes" },
-  { href: "/app/history", label: "History" },
-  { href: "/app/settings", label: "Settings" },
-] as const;
-
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { ethAddress, lockSession } = useWalletSession();
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border-subtle bg-surface-elevated/80 backdrop-blur-md">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border-subtle bg-surface-elevated/80 backdrop-blur-md lg:flex">
       <div className="flex min-h-14 flex-col justify-center gap-1 border-b border-border-subtle px-4 py-3">
         <NodeShareLogo size="sidebar" href="/" />
         <p className="text-[11px] text-text-muted">Decentralized AI compute</p>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
-        {items.map((item) => {
+        {APP_NAV_ITEMS.map((item) => {
           const active =
             pathname === item.href ||
             (item.href === "/app/dashboard" && pathname === "/app");

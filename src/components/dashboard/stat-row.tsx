@@ -9,12 +9,12 @@ type Stat = {
 
 export function StatRow({ stats }: { stats: Stat[] }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
       {stats.map((s) => (
         <div
           key={s.label}
           className={cn(
-            "rounded-[var(--radius-md)] border border-border-subtle bg-surface-elevated px-4 py-3 shadow-card",
+            "min-w-[min(100%,280px)] shrink-0 snap-start rounded-[var(--radius-md)] border border-border-subtle bg-surface-elevated px-4 py-3 shadow-card sm:min-w-0",
             s.emphasize && "border-accent/20 ring-1 ring-accent/10",
           )}
         >
