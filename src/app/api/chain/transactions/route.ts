@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getChainId, getUsdcAddress, getUsdtAddress } from "@/lib/chain/config";
+import { normalizeHexAddress } from "@/lib/chain/normalize-address";
 
 export const dynamic = "force-dynamic";
-
-function isAddress(a: string) {
-  return /^0x[a-fA-F0-9]{40}$/.test(a);
-}
 
 type EtherscanTx = {
   hash: string;
@@ -20,7 +17,7 @@ type EtherscanTx = {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const address = searchParams.get("address") ?? "";
+  const raw = searchParams.get("address") ?? "";
   const key = process.env.ETHERSCAN_API_KEY;
   const chainId = getChainId();
 
@@ -35,7 +32,10 @@ export async function GET(req: Request) {
     );
   }
 
-  if (!isAddress(address)) {
+  let address: string;
+  try {
+    address = normalizeHexAddress(raw.trim());
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Invalid or missing address", data: null },
       { status: 400 },
