@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -23,10 +23,7 @@ export function TerminalView() {
       setDetail("Unlock your wallet to use the terminal.");
       return;
     }
-    const res = await fetch(
-      apiUrl(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`),
-    );
-    const j = (await res.json()) as {
+    const got = await fetchApiJson<{
       ok: boolean;
       error?: string;
       data?: {
@@ -34,7 +31,13 @@ export function TerminalView() {
         usdc: { balance: string };
         usdt: { balance: string };
       };
-    };
+    }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`);
+    if (!got.ok) {
+      setAllowed(false);
+      setDetail(got.error);
+      return;
+    }
+    const j = got.body;
     if (!j.ok || !j.data) {
       setAllowed(false);
       setDetail(j.error ?? "Could not read balances");

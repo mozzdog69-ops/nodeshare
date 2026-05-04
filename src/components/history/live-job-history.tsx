@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -87,53 +87,51 @@ export function LiveJobHistory() {
     setEthErr(null);
     setAkashErr(null);
 
-    const ethP =
-      ethAddress &&
-      fetch(
-        apiUrl(`/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`),
-      );
-
-    const aktP =
-      aktAddress &&
-      fetch(
-        apiUrl(`/api/akash/leases?address=${encodeURIComponent(aktAddress)}&limit=25`),
-      );
-
     try {
-      if (ethP) {
-        const res = await ethP;
-        const j = (await res.json()) as {
+      if (ethAddress) {
+        const ethGot = await fetchApiJson<{
           ok: boolean;
           data?: { transfers?: TransferRow[] };
           error?: string;
-        };
-        if (j.ok && j.data?.transfers) setTransfers(j.data.transfers);
-        else {
+        }>(`/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`);
+        if (!ethGot.ok) {
           setTransfers([]);
-          setEthErr(j.error ?? "Could not load Ethereum transfers");
+          setEthErr(ethGot.error);
+        } else {
+          const j = ethGot.body;
+          if (j.ok && j.data?.transfers) setTransfers(j.data.transfers);
+          else {
+            setTransfers([]);
+            setEthErr(j.error ?? "Could not load Ethereum transfers");
+          }
         }
       } else {
         setTransfers([]);
       }
 
-      if (aktP) {
-        const res = await aktP;
-        const j = (await res.json()) as {
+      if (aktAddress) {
+        const aktGot = await fetchApiJson<{
           ok: boolean;
           data?: { leases?: unknown[] };
           error?: string;
-        };
-        if (j.ok) {
-          const raw = j.data?.leases;
-          const rows = Array.isArray(raw)
-            ? raw
-                .map((e, i) => formatLeaseEntry(e, i))
-                .filter((x): x is LeaseRow => x !== null)
-            : [];
-          setLeases(rows);
-        } else {
+        }>(`/api/akash/leases?address=${encodeURIComponent(aktAddress)}&limit=25`);
+        if (!aktGot.ok) {
           setLeases([]);
-          setAkashErr(j.error ?? "Could not load Akash leases");
+          setAkashErr(aktGot.error);
+        } else {
+          const j = aktGot.body;
+          if (j.ok) {
+            const raw = j.data?.leases;
+            const rows = Array.isArray(raw)
+              ? raw
+                  .map((e, i) => formatLeaseEntry(e, i))
+                  .filter((x): x is LeaseRow => x !== null)
+              : [];
+            setLeases(rows);
+          } else {
+            setLeases([]);
+            setAkashErr(j.error ?? "Could not load Akash leases");
+          }
         }
       } else {
         setLeases([]);

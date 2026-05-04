@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -8,21 +8,21 @@ export function MeshStatusBadge() {
   const [tone, setTone] = useState<"live" | "empty" | "error" | "pending">("pending");
 
   const load = useCallback(async () => {
-    try {
-      const res = await fetch(apiUrl("/api/akash/market?limit=8"));
-      const j = (await res.json()) as {
-        ok: boolean;
-        data?: { orders?: unknown[] };
-      };
-      if (!j.ok) {
-        setTone("error");
-        return;
-      }
-      const n = j.data?.orders?.length ?? 0;
-      setTone(n > 0 ? "live" : "empty");
-    } catch {
+    const got = await fetchApiJson<{
+      ok: boolean;
+      data?: { orders?: unknown[] };
+    }>("/api/akash/market?limit=8");
+    if (!got.ok) {
       setTone("error");
+      return;
     }
+    const j = got.body;
+    if (!j.ok) {
+      setTone("error");
+      return;
+    }
+    const n = j.data?.orders?.length ?? 0;
+    setTone(n > 0 ? "live" : "empty");
   }, []);
 
   useEffect(() => {

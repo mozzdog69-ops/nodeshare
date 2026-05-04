@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { ordersToMapNodes, type MapNode } from "@/lib/akash/summarize";
 
 export function ComputeNetworkMap() {
@@ -26,16 +26,22 @@ export function ComputeNetworkMap() {
     setErr(null);
     setInfo(null);
     try {
-      const res = await fetch(apiUrl("/api/akash/market?limit=24"));
-      const j = (await res.json()) as {
+      const got = await fetchApiJson<{
         ok: boolean;
         data?: { orders?: unknown[]; source?: string };
         error?: string;
-      };
+      }>("/api/akash/market?limit=24");
+      if (!got.ok) {
+        setNodes([]);
+        setSource(null);
+        setErr(got.error);
+        return;
+      }
+      const j = got.body;
       if (!j.ok) {
         setNodes([]);
         setSource(null);
-        setErr(j.error ?? "Akash LCD unreachable");
+        setErr(j.error ?? "Akash market unavailable");
         return;
       }
       const orders = Array.isArray(j.data?.orders) ? j.data!.orders : [];

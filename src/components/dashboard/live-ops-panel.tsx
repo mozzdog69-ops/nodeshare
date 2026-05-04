@@ -1,7 +1,7 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
 import { ordersToOfferCards } from "@/lib/akash/summarize";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
@@ -28,40 +28,55 @@ export function LiveOpsPanel() {
   }>({ ok: false, count: 0, sample: [] });
 
   const load = useCallback(async () => {
-    const [r, a] = await Promise.all([
-      fetch(apiUrl("/api/render/services")),
-      fetch(apiUrl("/api/akash/market?limit=12")),
+    const [rGot, aGot] = await Promise.all([
+      fetchApiJson<{
+        ok: boolean;
+        data?: { services: RenderSvc[] };
+        error?: string;
+      }>("/api/render/services"),
+      fetchApiJson<{
+        ok: boolean;
+        data?: { orders: unknown[]; source?: string };
+        error?: string;
+      }>("/api/akash/market?limit=12"),
     ]);
-    const rj = (await r.json()) as {
-      ok: boolean;
-      data?: { services: RenderSvc[] };
-      error?: string;
-    };
-    if (rj.ok && rj.data?.services)
-      setRender({ ok: true, services: rj.data.services, error: rj.error });
-    else setRender({ ok: false, services: [], error: rj.error });
 
-    const aj = (await a.json()) as {
-      ok: boolean;
-      data?: { orders: unknown[]; source?: string };
-      error?: string;
-    };
-    if (aj.ok && aj.data?.orders) {
-      const orders = aj.data.orders;
-      setAkash({
-        ok: true,
-        count: orders.length,
-        sample: orders.slice(0, 3),
-        source: aj.data.source,
-        error: aj.error,
-      });
-    } else
+    if (!rGot.ok) {
+      setRender({ ok: false, services: [], error: rGot.error });
+    } else {
+      const rj = rGot.body;
+      if (rj.ok && rj.data?.services)
+        setRender({ ok: true, services: rj.data.services, error: rj.error });
+      else setRender({ ok: false, services: [], error: rj.error });
+    }
+
+    if (!aGot.ok) {
       setAkash({
         ok: false,
         count: 0,
         sample: [],
-        error: aj.error,
+        error: aGot.error,
       });
+    } else {
+      const aj = aGot.body;
+      if (aj.ok && aj.data?.orders) {
+        const orders = aj.data.orders;
+        setAkash({
+          ok: true,
+          count: orders.length,
+          sample: orders.slice(0, 3),
+          source: aj.data.source,
+          error: aj.error,
+        });
+      } else {
+        setAkash({
+          ok: false,
+          count: 0,
+          sample: [],
+          error: aj.error ?? "Akash market returned no data.",
+        });
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -143,7 +158,8 @@ export function LiveOpsPanel() {
               Akash market (live)
             </h3>
             <p className="mt-1 text-sm text-text-secondary">
-              Open orders from a public LCD ({akash.source ? "reachable" : "n/a"}).
+              Pulls <code className="rounded bg-surface-base px-1 font-mono text-[11px]">v1beta5/orders/list</code>{" "}
+              from your API deployment (server-side LCD).
             </p>
           </div>
           <Button variant="ghost" className="text-xs" type="button" onClick={() => void load()}>
@@ -161,6 +177,11 @@ export function LiveOpsPanel() {
                 {akash.count}{" "}
                 <span className="text-sm font-normal text-text-muted">open orders (page)</span>
               </p>
+              {akash.source ? (
+                <p className="mt-1 font-mono text-[10px] text-text-muted break-all">
+                  {akash.source}
+                </p>
+              ) : null}
               <ul className="mt-3 space-y-2 text-sm">
                 {ordersToOfferCards(akash.sample, 3).map((o) => (
                   <li

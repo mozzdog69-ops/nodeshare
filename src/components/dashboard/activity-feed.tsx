@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import { useCallback, useEffect, useState } from "react";
 
@@ -18,57 +18,75 @@ export function ActivityFeed() {
   const [events, setEvents] = useState<Ev[]>([]);
 
   const load = useCallback(async () => {
-    const [mRes, tRes] = await Promise.all([
-      fetch(apiUrl("/api/akash/market?limit=12")),
+    const [mGot, tGot] = await Promise.all([
+      fetchApiJson<{
+        ok: boolean;
+        data?: { orders?: unknown[]; source?: string };
+        error?: string;
+      }>("/api/akash/market?limit=12"),
       ethAddress
-        ? fetch(
-            apiUrl(
-              `/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`,
-            ),
+        ? fetchApiJson<{
+            ok: boolean;
+            data?: {
+              transfers?: { hash: string; symbol: string; timestamp: number }[];
+            };
+            error?: string;
+          }>(
+            `/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`,
           )
-        : Promise.resolve(null as Response | null),
+        : Promise.resolve(null as Awaited<ReturnType<typeof fetchApiJson>> | null),
     ]);
 
     const next: Ev[] = [];
 
-    const mj = (await mRes.json()) as {
-      ok: boolean;
-      data?: { orders?: unknown[]; source?: string };
-      error?: string;
-    };
-    if (mj.ok && mj.data?.orders?.length) {
-      next.push({
-        id: "akash",
-        text: `${mj.data.orders.length} open Akash order(s) on this LCD page`,
-        tone: "success",
-      });
-    } else if (!mj.ok && mj.error) {
-      next.push({
-        id: "akash-fail",
-        text: mj.error,
-        tone: "warning",
-      });
+    if (!mGot.ok) {
+      next.push({ id: "akash-net", text: mGot.error, tone: "warning" });
     }
 
-    if (tRes) {
-      const tj = (await tRes.json()) as {
-        ok: boolean;
-        error?: string;
-        data?: { transfers?: { hash: string; symbol: string; timestamp: number }[] };
-      };
-      const tr = tj.data?.transfers?.[0];
-      if (tj.ok && tr) {
+    const mj = mGot.ok
+      ? mGot.body
+      : { ok: false as const, error: undefined, data: undefined };
+    if (mGot.ok) {
+      if (mj.ok && mj.data?.orders?.length) {
         next.push({
-          id: `tx-${tr.hash}`,
-          text: `Latest ${tr.symbol} · ${new Date(tr.timestamp).toLocaleString()}`,
-          tone: "neutral",
+          id: "akash",
+          text: `${mj.data.orders.length} open Akash order(s) on this LCD page`,
+          tone: "success",
         });
-      } else if (!tj.ok && tj.error) {
+      } else if (!mj.ok && mj.error) {
         next.push({
-          id: "tx-fail",
-          text: tj.error,
+          id: "akash-fail",
+          text: mj.error,
           tone: "warning",
         });
+      }
+    }
+
+    if (tGot) {
+      if (!tGot.ok) {
+        next.push({ id: "tx-net", text: tGot.error, tone: "warning" });
+      } else {
+        const tj = tGot.body as {
+          ok: boolean;
+          error?: string;
+          data?: {
+            transfers?: { hash: string; symbol: string; timestamp: number }[];
+          };
+        };
+        const tr = tj.data?.transfers?.[0];
+        if (tj.ok && tr) {
+          next.push({
+            id: `tx-${tr.hash}`,
+            text: `Latest ${tr.symbol} · ${new Date(tr.timestamp).toLocaleString()}`,
+            tone: "neutral",
+          });
+        } else if (!tj.ok && tj.error) {
+          next.push({
+            id: "tx-fail",
+            text: tj.error,
+            tone: "warning",
+          });
+        }
       }
     }
 

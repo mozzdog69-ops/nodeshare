@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -25,14 +25,17 @@ export function DashboardLiveBalances() {
 
   const load = useCallback(async () => {
     if (!ethAddress) return;
-    const res = await fetch(
-      apiUrl(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`),
-    );
-    const j = (await res.json()) as {
+    const got = await fetchApiJson<{
       ok: boolean;
       data?: Bal;
       error?: string;
-    };
+    }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`);
+    if (!got.ok) {
+      setData(null);
+      setErr(got.error);
+      return;
+    }
+    const j = got.body;
     if (j.ok && j.data) {
       setData(j.data);
       setErr(null);

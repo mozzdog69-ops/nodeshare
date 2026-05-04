@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import { useCallback, useEffect, useState } from "react";
 import { StatRow } from "@/components/dashboard/stat-row";
@@ -12,28 +12,36 @@ export function DashboardLiveStats() {
   const [meshHint, setMeshHint] = useState<string>("");
 
   const load = useCallback(async () => {
-    const [mRes, balRes] = await Promise.all([
-      fetch(apiUrl("/api/akash/market?limit=40")),
+    const [mGot, balGot] = await Promise.all([
+      fetchApiJson<{
+        ok: boolean;
+        data?: { orders?: unknown[] };
+        error?: string;
+      }>("/api/akash/market?limit=40"),
       ethAddress
-        ? fetch(apiUrl(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`))
-        : Promise.resolve(null as Response | null),
+        ? fetchApiJson<{
+            ok: boolean;
+            data?: { usdc?: { balance?: string }; usdt?: { balance?: string } };
+          }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`)
+        : Promise.resolve(null as Awaited<ReturnType<typeof fetchApiJson>> | null),
     ]);
 
-    const mj = (await mRes.json()) as {
-      ok: boolean;
-      data?: { orders?: unknown[] };
-      error?: string;
-    };
-    const count = mj.ok && mj.data?.orders ? mj.data.orders.length : 0;
-    setOrders(mj.ok ? count : 0);
-    setMeshHint(
-      mj.ok
-        ? `Open orders (state=open) · LCD page limit`
-        : (mj.error ?? "Akash market request failed"),
-    );
+    if (!mGot.ok) {
+      setOrders(0);
+      setMeshHint(mGot.error);
+    } else {
+      const mj = mGot.body;
+      const count = mj.ok && mj.data?.orders ? mj.data.orders.length : 0;
+      setOrders(mj.ok ? count : 0);
+      setMeshHint(
+        mj.ok
+          ? `Open orders (state=open) · LCD page limit`
+          : (mj.error ?? "Akash market request failed"),
+      );
+    }
 
-    if (balRes) {
-      const bj = (await balRes.json()) as {
+    if (balGot?.ok) {
+      const bj = balGot.body as {
         ok: boolean;
         data?: { usdc?: { balance?: string }; usdt?: { balance?: string } };
       };

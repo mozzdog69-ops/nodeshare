@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { useWalletSession } from "@/context/wallet-session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -55,53 +55,58 @@ export function LiveWalletPanel() {
     setBalErr(null);
     setTxErr(null);
     setAktErr(null);
-    const [bRes, tRes] = await Promise.all([
-      fetch(
-        apiUrl(
-          `/api/chain/balances?address=${encodeURIComponent(ethAddress)}`,
-        ),
-      ),
-      fetch(
-        apiUrl(
-          `/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`,
-        ),
-      ),
-    ]);
-    const bJson = (await bRes.json()) as {
-      ok: boolean;
-      data?: BalancesPayload;
-      error?: string;
-    };
-    if (bJson.ok && bJson.data) setBalances(bJson.data);
-    else setBalErr(bJson.error ?? "Could not load balances");
 
-    const tJson = (await tRes.json()) as {
-      ok: boolean;
-      data?: { transfers: TransferRow[] };
-      error?: string;
-    };
-    if (tJson.ok && tJson.data?.transfers) setTxs(tJson.data.transfers);
-    else {
+    const [bGot, tGot] = await Promise.all([
+      fetchApiJson<{
+        ok: boolean;
+        data?: BalancesPayload;
+        error?: string;
+      }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`),
+      fetchApiJson<{
+        ok: boolean;
+        data?: { transfers: TransferRow[] };
+        error?: string;
+      }>(`/api/chain/transactions?address=${encodeURIComponent(ethAddress)}`),
+    ]);
+
+    if (!bGot.ok) {
+      setBalances(null);
+      setBalErr(bGot.error);
+    } else {
+      const bJson = bGot.body;
+      if (bJson.ok && bJson.data) setBalances(bJson.data);
+      else setBalErr(bJson.error ?? "Could not load balances");
+    }
+
+    if (!tGot.ok) {
       setTxs([]);
-      setTxErr(tJson.error ?? null);
+      setTxErr(tGot.error);
+    } else {
+      const tJson = tGot.body;
+      if (tJson.ok && tJson.data?.transfers) setTxs(tJson.data.transfers);
+      else {
+        setTxs([]);
+        setTxErr(tJson.error ?? null);
+      }
     }
 
     if (identity?.aktAddress) {
-      const aRes = await fetch(
-        apiUrl(
-          `/api/akash/bank?address=${encodeURIComponent(identity.aktAddress)}`,
-        ),
-      );
-      const aJson = (await aRes.json()) as {
+      const aGot = await fetchApiJson<{
         ok: boolean;
         data?: { aktFormatted?: string };
         error?: string;
-      };
-      if (aJson.ok && aJson.data?.aktFormatted != null) {
-        setAktBal(aJson.data.aktFormatted);
-      } else {
+      }>(`/api/akash/bank?address=${encodeURIComponent(identity.aktAddress)}`);
+      if (!aGot.ok) {
         setAktBal(null);
-        setAktErr(aJson.error ?? "Could not load AKT");
+        setAktErr(aGot.error);
+      } else {
+        const aJson = aGot.body;
+        if (aJson.ok && aJson.data?.aktFormatted != null) {
+          setAktBal(aJson.data.aktFormatted);
+        } else {
+          setAktBal(null);
+          setAktErr(aJson.error ?? "Could not load AKT");
+        }
       }
     } else {
       setAktBal(null);

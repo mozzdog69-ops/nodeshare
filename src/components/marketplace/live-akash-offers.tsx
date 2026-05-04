@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { apiUrl } from "@/lib/api-base";
+import { fetchApiJson } from "@/lib/fetch-api";
 import { ordersToOfferCards, type OfferCard } from "@/lib/akash/summarize";
 
 type Props = {
@@ -30,8 +30,7 @@ export function LiveAkashOffers({
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(apiUrl(`/api/akash/market?limit=${limit}`));
-      const j = (await res.json()) as {
+      const got = await fetchApiJson<{
         ok: boolean;
         data?: {
           orders?: unknown[];
@@ -39,8 +38,16 @@ export function LiveAkashOffers({
           attempts?: string[];
         };
         error?: string;
-      };
+      }>(`/api/akash/market?limit=${limit}`);
 
+      if (!got.ok) {
+        setCards([]);
+        setSource(null);
+        setErr(got.error);
+        return;
+      }
+
+      const j = got.body;
       if (!j.ok) {
         setCards([]);
         setSource(null);
@@ -59,11 +66,7 @@ export function LiveAkashOffers({
     } catch (e) {
       setCards([]);
       setSource(null);
-      setErr(
-        e instanceof Error
-          ? e.message
-          : "Network error — check NEXT_PUBLIC_API_BASE / connection.",
-      );
+      setErr(e instanceof Error ? e.message : "Unexpected error loading market.");
     } finally {
       setLoading(false);
     }
