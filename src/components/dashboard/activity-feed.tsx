@@ -39,22 +39,13 @@ export function ActivityFeed() {
     if (mj.ok && mj.data?.orders?.length) {
       next.push({
         id: "akash",
-        text: `Akash mesh: ${mj.data.orders.length} open bids (sampled)`,
+        text: `${mj.data.orders.length} open Akash order(s) on this LCD page`,
         tone: "success",
       });
-      if (mj.data.source) {
-        next.push({
-          id: "lcd",
-          text: `LCD ${mj.data.source.replace(/^https?:\/\//, "").split("/")[0]}`,
-          tone: "neutral",
-        });
-      }
-    } else {
+    } else if (!mj.ok && mj.error) {
       next.push({
         id: "akash-fail",
-        text: mj.error
-          ? `Akash market: ${mj.error}`
-          : "Akash market: no orders returned",
+        text: mj.error,
         tone: "warning",
       });
     }
@@ -62,28 +53,23 @@ export function ActivityFeed() {
     if (tRes) {
       const tj = (await tRes.json()) as {
         ok: boolean;
+        error?: string;
         data?: { transfers?: { hash: string; symbol: string; timestamp: number }[] };
       };
       const tr = tj.data?.transfers?.[0];
       if (tj.ok && tr) {
         next.push({
           id: `tx-${tr.hash}`,
-          text: `Latest ${tr.symbol}: ${new Date(tr.timestamp).toLocaleString()}`,
+          text: `Latest ${tr.symbol} · ${new Date(tr.timestamp).toLocaleString()}`,
           tone: "neutral",
         });
-      } else if (!tj.ok) {
+      } else if (!tj.ok && tj.error) {
         next.push({
           id: "tx-fail",
-          text: "Stablecoin tx feed needs ETHERSCAN_API_KEY + wallet",
+          text: tj.error,
           tone: "warning",
         });
       }
-    } else {
-      next.push({
-        id: "unlock",
-        text: "Unlock wallet to stream your USDC/USDT activity here",
-        tone: "neutral",
-      });
     }
 
     setEvents(next.slice(0, 6));
@@ -109,28 +95,34 @@ export function ActivityFeed() {
           Refresh
         </button>
       </div>
-      <ul className="space-y-2">
-        {events.map((e, i) => (
-          <motion.li
-            key={e.id}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.06 }}
-            className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-elevated px-3 py-2.5 text-sm"
-          >
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                e.tone === "success"
-                  ? "bg-success"
-                  : e.tone === "warning"
-                    ? "bg-warning"
-                    : "bg-text-muted"
-              }`}
-            />
-            <span className={toneClass[e.tone]}>{e.text}</span>
-          </motion.li>
-        ))}
-      </ul>
+      {events.length === 0 ? (
+        <p className="rounded-lg border border-border-subtle bg-surface-elevated px-3 py-4 text-sm text-text-muted">
+          No activity yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {events.map((e, i) => (
+            <motion.li
+              key={`${e.id}-${i}`}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06 }}
+              className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-elevated px-3 py-2.5 text-sm"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  e.tone === "success"
+                    ? "bg-success"
+                    : e.tone === "warning"
+                      ? "bg-warning"
+                      : "bg-text-muted"
+                }`}
+              />
+              <span className={toneClass[e.tone]}>{e.text}</span>
+            </motion.li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

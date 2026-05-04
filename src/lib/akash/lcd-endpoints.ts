@@ -1,9 +1,11 @@
 /**
  * Akash mainnet REST LCD bases (Cosmos REST / gRPC-gateway).
  * Source of truth: https://github.com/cosmos/chain-registry/blob/master/akash/chain.json → apis.rest
- * Paths like `/akash/market/v1beta4/orders` are appended to each base (bases may end with `/api`).
+ * Market orders (Node v2): `/akash/market/v1beta5/orders/list?…&filters.state=open`
+ * (see `src/app/api/akash/market/route.ts`). Bases may end with `/api`.
  */
 export const DEFAULT_AKASH_LCD_BASES = [
+  "https://api.akashnet.net",
   "https://rest-akash.ecostake.com",
   "https://akash-api.polkachu.com",
   "https://akash-api.kleomedes.network",

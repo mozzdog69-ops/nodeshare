@@ -11,6 +11,7 @@ export function ComputeNetworkMap() {
   const [selected, setSelected] = useState<MapNode | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const curves = useMemo(
     () => [
@@ -23,21 +24,37 @@ export function ComputeNetworkMap() {
 
   const load = useCallback(async () => {
     setErr(null);
-    const res = await fetch(apiUrl("/api/akash/market?limit=24"));
-    const j = (await res.json()) as {
-      ok: boolean;
-      data?: { orders: unknown[]; source?: string };
-      error?: string;
-    };
-    if (!j.ok || !j.data?.orders?.length) {
+    setInfo(null);
+    try {
+      const res = await fetch(apiUrl("/api/akash/market?limit=24"));
+      const j = (await res.json()) as {
+        ok: boolean;
+        data?: { orders?: unknown[]; source?: string };
+        error?: string;
+      };
+      if (!j.ok) {
+        setNodes([]);
+        setSource(null);
+        setErr(j.error ?? "Akash LCD unreachable");
+        return;
+      }
+      const orders = Array.isArray(j.data?.orders) ? j.data!.orders : [];
+      setSource(j.data?.source ?? null);
+      if (orders.length === 0) {
+        setNodes([]);
+        setSelected(null);
+        setInfo(
+          "LCD returned zero open orders (quiet market or try another REST node via AKASH_LCD_URL).",
+        );
+        return;
+      }
+      setNodes(ordersToMapNodes(orders));
+      setSelected(null);
+    } catch (e) {
       setNodes([]);
       setSource(null);
-      setErr(j.error ?? "Akash LCD unreachable");
-      return;
+      setErr(e instanceof Error ? e.message : "Failed to load map");
     }
-    setSource(j.data.source ?? null);
-    setNodes(ordersToMapNodes(j.data.orders));
-    setSelected(null);
   }, []);
 
   useEffect(() => {
@@ -84,10 +101,16 @@ export function ComputeNetworkMap() {
               />
             ))}
           </svg>
-          {err ? (
+          {err || info ? (
             <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-              <p className="max-w-sm text-sm text-amber-800">
-                {err}{" "}
+              <p
+                className={
+                  err
+                    ? "max-w-sm text-sm text-amber-800"
+                    : "max-w-sm text-sm text-text-secondary"
+                }
+              >
+                {err ?? info}{" "}
                 <button
                   type="button"
                   className="font-medium text-accent underline"

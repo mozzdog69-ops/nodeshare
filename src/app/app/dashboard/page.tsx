@@ -2,6 +2,7 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardLiveBalances } from "@/components/dashboard/dashboard-live-balances";
 import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
 import { LiveOpsPanel } from "@/components/dashboard/live-ops-panel";
+import { MeshStatusBadge } from "@/components/dashboard/mesh-status-badge";
 import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -15,9 +16,7 @@ export default function DashboardPage() {
     <div className="flex flex-1 flex-col">
       <header className="flex h-14 items-center justify-between border-b border-border-subtle bg-surface-elevated/80 px-6 backdrop-blur-md">
         <h1 className="text-sm font-semibold text-text-primary">Dashboard</h1>
-        <span className="rounded-full border border-success-muted bg-success-muted px-3 py-1 text-xs font-medium text-success">
-          Mesh live (LCD)
-        </span>
+        <MeshStatusBadge />
       </header>
       <div className="flex-1 space-y-8 p-6">
         <section>

@@ -7,33 +7,34 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-function tryOrdersJson(json: unknown): unknown[] {
-  if (!json || typeof json !== "object") return [];
-  const o = json as Record<string, unknown>;
-  const orders = o.orders ?? o.order;
-  return Array.isArray(orders) ? orders : [];
+function isAkashAddr(a: string) {
+  return /^akash1[a-z0-9]{38}$/.test(a);
 }
 
-const ORDER_API_VERSIONS = ["v1beta5", "v1beta4", "v1beta3"] as const;
+function tryLeasesJson(json: unknown): unknown[] {
+  if (!json || typeof json !== "object") return [];
+  const o = json as Record<string, unknown>;
+  const leases = o.leases ?? o.lease;
+  return Array.isArray(leases) ? leases : [];
+}
 
-/**
- * Akash node v2 (mainnet) serves market orders at `…/v1beta5/orders/list` with
- * `filters.state=open` (v1beta4/3 LCD routes return UNIMPLEMENTED on public nodes).
- */
-async function fetchOrdersFrom(
+const LEASE_API_VERSIONS = ["v1beta5", "v1beta4", "v1beta3"] as const;
+
+async function fetchLeasesFrom(
   baseRaw: string,
-  apiVer: (typeof ORDER_API_VERSIONS)[number],
+  apiVer: (typeof LEASE_API_VERSIONS)[number],
+  owner: string,
   limit: number,
 ): Promise<
-  | { ok: true; orders: unknown[]; source: string }
+  | { ok: true; leases: unknown[]; source: string }
   | { ok: false; source: string; status?: number; err?: string }
 > {
   const base = baseRaw.replace(/\/$/, "");
   const qs = new URLSearchParams({
     "pagination.limit": String(limit),
-    "filters.state": "open",
+    "filters.owner": owner,
   });
-  const path = `/akash/market/${apiVer}/orders/list?${qs.toString()}`;
+  const path = `/akash/market/${apiVer}/leases/list?${qs.toString()}`;
   const url = `${base}${path}`;
   try {
     const res = await fetch(url, {
@@ -51,8 +52,8 @@ async function fetchOrdersFrom(
     } catch {
       return { ok: false, source: url, err: "invalid JSON body" };
     }
-    const orders = tryOrdersJson(json);
-    return { ok: true, orders, source: url };
+    const leases = tryLeasesJson(json);
+    return { ok: true, leases, source: url };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, source: url, err: msg };
@@ -61,10 +62,18 @@ async function fetchOrdersFrom(
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
+  const raw = (searchParams.get("address") ?? "").trim();
   const limit = Math.min(
     40,
-    Math.max(5, parseInt(searchParams.get("limit") ?? "15", 10) || 15),
+    Math.max(3, parseInt(searchParams.get("limit") ?? "20", 10) || 20),
   );
+
+  if (!isAkashAddr(raw)) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid or missing akash1… address", data: { leases: [] } },
+      { status: 400 },
+    );
+  }
 
   const bases = (
     process.env.AKASH_LCD_URL
@@ -74,15 +83,15 @@ export async function GET(req: Request) {
 
   const attempts: string[] = [];
 
-  for (const ver of ORDER_API_VERSIONS) {
+  for (const ver of LEASE_API_VERSIONS) {
     for (const base of bases) {
-      const got = await fetchOrdersFrom(base, ver, limit);
+      const got = await fetchLeasesFrom(base, ver, raw, limit);
       if (got.ok) {
         return NextResponse.json({
           ok: true,
           data: {
             source: got.source,
-            orders: got.orders,
+            leases: got.leases,
           },
         });
       }
@@ -98,8 +107,8 @@ export async function GET(req: Request) {
     {
       ok: false,
       error:
-        "No Akash LCD returned open orders. Mainnet needs /akash/market/v1beta5/orders/list (e.g. set AKASH_LCD_URL=https://api.akashnet.net).",
-      data: { orders: [], attempts: attempts.slice(-15) },
+        "No Akash LCD returned leases for this owner. Set AKASH_LCD_URL=https://api.akashnet.net if needed.",
+      data: { leases: [], attempts: attempts.slice(-15) },
     },
     { status: 502 },
   );

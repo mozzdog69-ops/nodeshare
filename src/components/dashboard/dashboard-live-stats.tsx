@@ -22,13 +22,14 @@ export function DashboardLiveStats() {
     const mj = (await mRes.json()) as {
       ok: boolean;
       data?: { orders?: unknown[] };
+      error?: string;
     };
     const count = mj.ok && mj.data?.orders ? mj.data.orders.length : 0;
-    setOrders(count);
+    setOrders(mj.ok ? count : 0);
     setMeshHint(
       mj.ok
-        ? `Open bids on sampled page · mesh snapshot`
-        : "Akash LCD unreachable",
+        ? `Open orders (state=open) · LCD page limit`
+        : (mj.error ?? "Akash market request failed"),
     );
 
     if (balRes) {
@@ -52,7 +53,7 @@ export function DashboardLiveStats() {
   const stats = [
     {
       label: "Open Akash bids",
-      value: orders === null ? "…" : String(orders),
+      value: orders === null ? "…" : String(orders ?? 0),
       hint: "LCD market orders (current page)",
     },
     {

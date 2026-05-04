@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl } from "@/lib/api-base";
+import { ordersToOfferCards } from "@/lib/akash/summarize";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
@@ -152,17 +153,26 @@ export function LiveOpsPanel() {
         <CardContent>
           {!akash.ok ? (
             <p className="text-sm text-amber-800">
-              {akash.error ?? "LCD unreachable — try AKASH_LCD_URL in env."}
+              {akash.error ?? "Akash market feed unavailable."}
             </p>
           ) : (
             <>
               <p className="font-mono text-2xl font-semibold text-text-primary">
                 {akash.count}{" "}
-                <span className="text-sm font-normal text-text-muted">orders in page</span>
+                <span className="text-sm font-normal text-text-muted">open orders (page)</span>
               </p>
-              <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-terminal-bg p-3 font-mono text-[11px] leading-relaxed text-terminal-success">
-                {JSON.stringify(akash.sample, null, 2)}
-              </pre>
+              <ul className="mt-3 space-y-2 text-sm">
+                {ordersToOfferCards(akash.sample, 3).map((o) => (
+                  <li
+                    key={o.id}
+                    className="rounded-lg border border-border-subtle bg-surface-base px-3 py-2"
+                  >
+                    <p className="font-medium text-text-primary">{o.title}</p>
+                    <p className="mt-0.5 text-xs text-text-secondary">{o.gpu}</p>
+                    <p className="mt-1 font-mono text-sm text-accent">{o.price}</p>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
         </CardContent>

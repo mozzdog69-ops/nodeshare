@@ -53,8 +53,19 @@ function pickPrice(s: string, raw: unknown): string {
 function orderId(raw: unknown, index: number): string {
   if (raw && typeof raw === "object" && "id" in raw) {
     const id = (raw as { id?: unknown }).id;
-    if (id && typeof id === "object" && "oid" in id) {
-      return String((id as { oid?: unknown }).oid ?? index);
+    if (id && typeof id === "object") {
+      const o = id as Record<string, unknown>;
+      if ("oid" in o) return String(o.oid ?? index);
+      const dseq = o.dseq;
+      const gseq = o.gseq;
+      const oseq = o.oseq;
+      if (
+        (typeof dseq === "string" || typeof dseq === "number") &&
+        typeof gseq === "number" &&
+        typeof oseq === "number"
+      ) {
+        return `${dseq}-${gseq}-${oseq}`;
+      }
     }
     if (typeof id === "string" || typeof id === "number") return String(id);
   }
