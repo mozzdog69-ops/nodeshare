@@ -1,5 +1,6 @@
 import {
   AKASH_FETCH_HEADERS,
+  AKASH_FETCH_TIMEOUT_MS,
   DEFAULT_AKASH_LCD_BASES,
 } from "@/lib/akash/lcd-endpoints";
 import { NextResponse } from "next/server";
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
       const res = await fetch(url, {
         headers: AKASH_FETCH_HEADERS,
         next: { revalidate: 30 },
+        signal: AbortSignal.timeout(AKASH_FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
         lastErr = `${base} → ${res.status}`;
@@ -69,7 +71,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       ok: false,
-      error: `${lastErr} — tried multiple LCDs; override with AKASH_LCD_URL if needed.`,
+      error: `${lastErr} — set AKASH_LCD_URL to a working REST node from the Akash chain-registry REST list.`,
       data: null,
     },
     { status: 502 },

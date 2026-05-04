@@ -1,15 +1,11 @@
 import {
   AKASH_FETCH_HEADERS,
+  AKASH_FETCH_TIMEOUT_MS,
   DEFAULT_AKASH_LCD_BASES,
 } from "@/lib/akash/lcd-endpoints";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-const FETCH_OPTS: RequestInit = {
-  headers: AKASH_FETCH_HEADERS,
-  next: { revalidate: 15 },
-};
 
 function tryOrdersJson(json: unknown): unknown[] {
   if (!json || typeof json !== "object") return [];
@@ -18,22 +14,38 @@ function tryOrdersJson(json: unknown): unknown[] {
   return Array.isArray(orders) ? orders : [];
 }
 
-/** Try one GET; returns orders + url on 200 + parseable body. */
 async function fetchOrdersFrom(
-  base: string,
+  baseRaw: string,
   apiVer: "v1beta4" | "v1beta3",
   limit: number,
-): Promise<{ orders: unknown[]; source: string } | null> {
+): Promise<
+  | { ok: true; orders: unknown[]; source: string }
+  | { ok: false; source: string; status?: number; err?: string }
+> {
+  const base = baseRaw.replace(/\/$/, "");
   const path = `/akash/market/${apiVer}/orders?pagination.limit=${limit}`;
   const url = `${base}${path}`;
   try {
-    const res = await fetch(url, FETCH_OPTS);
-    if (!res.ok) return null;
-    const json = (await res.json()) as unknown;
+    const res = await fetch(url, {
+      headers: AKASH_FETCH_HEADERS,
+      next: { revalidate: 15 },
+      signal: AbortSignal.timeout(AKASH_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      return { ok: false, source: url, status: res.status };
+    }
+    const text = await res.text();
+    let json: unknown;
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      return { ok: false, source: url, err: "invalid JSON body" };
+    }
     const orders = tryOrdersJson(json);
-    return { orders, source: url };
-  } catch {
-    return null;
+    return { ok: true, orders, source: url };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, source: url, err: msg };
   }
 }
 
@@ -50,14 +62,12 @@ export async function GET(req: Request) {
       : [...DEFAULT_AKASH_LCD_BASES]
   ).map((b) => b.replace(/\/$/, ""));
 
-  /**
-   * Prefer v1beta4 everywhere first (publicnode-style mirrors often 501 on beta3).
-   * Then retry all bases with v1beta3.
-   */
+  const attempts: string[] = [];
+
   for (const ver of ["v1beta4", "v1beta3"] as const) {
     for (const base of bases) {
       const got = await fetchOrdersFrom(base, ver, limit);
-      if (got) {
+      if (got.ok) {
         return NextResponse.json({
           ok: true,
           data: {
@@ -66,6 +76,11 @@ export async function GET(req: Request) {
           },
         });
       }
+      const bit =
+        got.status !== undefined
+          ? `${got.source} → HTTP ${got.status}`
+          : `${got.source} → ${got.err ?? "failed"}`;
+      attempts.push(bit);
     }
   }
 
@@ -73,8 +88,8 @@ export async function GET(req: Request) {
     {
       ok: false,
       error:
-        "No Akash LCD returned market orders (tried v1beta4 then v1beta3 on multiple REST nodes). Set AKASH_LCD_URL to a REST base you trust.",
-      data: { orders: [] },
+        "No Akash LCD returned valid market orders. Override with AKASH_LCD_URL (REST base from chain-registry REST list).",
+      data: { orders: [], attempts: attempts.slice(-15) },
     },
     { status: 502 },
   );

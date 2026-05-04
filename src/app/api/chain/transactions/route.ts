@@ -49,16 +49,30 @@ function parseTokentx(json: EtherscanJson):
   return { ok: false, detail };
 }
 
-async function fetchTokentx(url: URL): Promise<
-  | { ok: true; rows: EtherscanTx[] }
-  | { ok: false; detail: string }
-> {
+/** Etherscan deprecated legacy V1 — use unified V2 only (see docs.etherscan.io/v2-migration). */
+async function fetchTokentxV2(
+  apiKey: string,
+  chainId: number,
+  addrParam: string,
+): Promise<{ ok: true; rows: EtherscanTx[] } | { ok: false; detail: string }> {
+  const url = new URL("https://api.etherscan.io/v2/api");
+  url.searchParams.set("chainid", String(chainId));
+  url.searchParams.set("module", "account");
+  url.searchParams.set("action", "tokentx");
+  url.searchParams.set("address", addrParam);
+  url.searchParams.set("page", "1");
+  url.searchParams.set("offset", "40");
+  url.searchParams.set("startblock", "0");
+  url.searchParams.set("endblock", "99999999");
+  url.searchParams.set("sort", "desc");
+  url.searchParams.set("apikey", apiKey);
+
   const res = await fetch(url.toString(), {
     next: { revalidate: 30 },
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
-    return { ok: false, detail: `HTTP ${res.status} from Etherscan` };
+    return { ok: false, detail: `HTTP ${res.status} from Etherscan V2` };
   }
   const json = (await res.json()) as EtherscanJson;
   return parseTokentx(json);
@@ -75,7 +89,7 @@ export async function GET(req: Request) {
       {
         ok: false,
         error:
-          "ETHERSCAN_API_KEY is missing or still a placeholder — add a key from etherscan.io/myapikey (Vercel → Env → Redeploy).",
+          "ETHERSCAN_API_KEY missing — create a key at etherscan.io/myapikey (unified V2). Paste into Vercel with no quotes/spaces, then redeploy.",
         data: { transfers: [] as unknown[] },
       },
       { status: 503 },
@@ -96,66 +110,22 @@ export async function GET(req: Request) {
   const usdc = getUsdcAddress().toLowerCase();
   const usdt = getUsdtAddress().toLowerCase();
 
-  function buildV1(): URL {
-    const url = new URL("https://api.etherscan.io/api");
-    url.searchParams.set("module", "account");
-    url.searchParams.set("action", "tokentx");
-    url.searchParams.set("address", addrParam);
-    url.searchParams.set("page", "1");
-    url.searchParams.set("offset", "40");
-    url.searchParams.set("startblock", "0");
-    url.searchParams.set("endblock", "99999999");
-    url.searchParams.set("sort", "desc");
-    url.searchParams.set("apikey", apiKey);
-    return url;
-  }
-
-  function buildV2(): URL {
-    const url = new URL("https://api.etherscan.io/v2/api");
-    url.searchParams.set("chainid", String(chainId));
-    url.searchParams.set("module", "account");
-    url.searchParams.set("action", "tokentx");
-    url.searchParams.set("address", addrParam);
-    url.searchParams.set("page", "1");
-    url.searchParams.set("offset", "40");
-    url.searchParams.set("startblock", "0");
-    url.searchParams.set("endblock", "99999999");
-    url.searchParams.set("sort", "desc");
-    url.searchParams.set("apikey", apiKey);
-    return url;
-  }
-
   try {
-    const errors: string[] = [];
-    let rows: EtherscanTx[] | null = null;
+    const parsed = await fetchTokentxV2(apiKey, chainId, addrParam);
 
-    if (chainId === 1) {
-      const v1 = await fetchTokentx(buildV1());
-      if (v1.ok) {
-        rows = v1.rows;
-      } else {
-        errors.push(`v1: ${v1.detail}`);
-      }
-    }
-
-    if (rows === null) {
-      const v2 = await fetchTokentx(buildV2());
-      if (v2.ok) {
-        rows = v2.rows;
-      } else {
-        errors.push(`v2: ${v2.detail}`);
-      }
-    }
-
-    if (rows === null) {
+    if (!parsed.ok) {
+      const hint =
+        /invalid api key|#err2/i.test(parsed.detail)
+          ? " Regenerate your API key on Etherscan (API Dashboard → create new key); legacy keys may not work with V2."
+          : "";
       return NextResponse.json({
         ok: false,
-        error: `${errors.join(" · ")} — Check the key at etherscan.io; free tier has rate limits. No spaces in ETHERSCAN_API_KEY.`,
+        error: `Etherscan V2: ${parsed.detail}.${hint}`,
         data: { transfers: [] },
       });
     }
 
-    const filtered = rows.filter((t) => {
+    const filtered = parsed.rows.filter((t) => {
       const c = t.contractAddress?.toLowerCase();
       return c === usdc || c === usdt;
     });
