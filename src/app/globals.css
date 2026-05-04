@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "@xterm/xterm/css/xterm.css";
+
+:root {
+  /* Surfaces — near-white, soft gray (Stripe-like) */
+  --surface-base: #f6f7f9;
+  --surface-elevated: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.12);
+
+  /* Text — graphite / slate */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  /* Accent — deep crimson (not scam-red) */
+  --accent: #e11d48;
+  --accent-hover: #be123c;
+  --accent-muted: rgba(225, 29, 72, 0.12);
+  --accent-glow: rgba(225, 29, 72, 0.35);
+
+  /* Semantic */
+  --success: #22c55e;
+  --success-muted: rgba(34, 197, 94, 0.14);
+  --warning: #f59e0b;
+  --warning-muted: rgba(245, 158, 11, 0.16);
+
+  /* Terminal island (dark inside light UI) */
+  --terminal-bg: #0c0f14;
+  --terminal-fg: #e2e8f0;
+  --terminal-dim: #64748b;
+  --terminal-accent: #fb7185;
+  --terminal-success: #4ade80;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(225, 29, 72, 0.08),
+    0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+@theme inline {
+  --color-surface-base: var(--surface-base);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-glass: var(--surface-glass);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-terminal-bg: var(--terminal-bg);
+  --color-terminal-fg: var(--terminal-fg);
+  --color-terminal-dim: var(--terminal-dim);
+  --color-terminal-accent: var(--terminal-accent);
+  --color-terminal-success: var(--terminal-success);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    filter: blur(12px);
+  }
+  50% {
+    opacity: 0.65;
+    filter: blur(16px);
+  }
+}
+
+@keyframes node-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes cursor-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes spin-up {
+  0% {
+    transform: rotate(0deg) scale(0.96);
+    opacity: 0.6;
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-node-breathe {
+  animation: node-breathe 4s ease-in-out infinite;
+}
+
+.animate-cursor-pulse {
+  animation: cursor-pulse 1.1s ease-in-out infinite;
+}
+
+.animate-spin-up {
+  animation: spin-up 1.2s ease-out forwards;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+/* xterm tweaks inside our shell */
+.xterm {
+  padding: 12px;
+}
+.xterm-viewport {
+  border-radius: var(--radius-md);
+}
