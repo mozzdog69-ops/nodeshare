@@ -1,4 +1,4 @@
-const partners = ["Akash", "Render", "Ethereum", "IPFS"] as const;
+const partners = ["Akash mainnet", "Ethereum", "USDC / USDT", "On-chain bids"] as const;
 
 export function TrustStrip() {
   return (

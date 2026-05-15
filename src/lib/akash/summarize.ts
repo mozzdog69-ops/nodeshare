@@ -1,3 +1,5 @@
+import { formatAkashPrice } from "@/lib/akash/pricing";
+
 export type MapNode = {
   id: string;
   x: number;
@@ -15,11 +17,15 @@ export type OfferCard = {
   title: string;
   gpu: string;
   resources: string;
+  resourceChips: string[];
   price: string;
   priceNote: string;
+  priceMonthly: string | null;
   badge: string;
   state: string;
   orderRef: string;
+  provider: string;
+  hasGpu: boolean;
 };
 
 type ParsedResource = {
@@ -29,6 +35,7 @@ type ParsedResource = {
   gpu: string;
   price: string;
   priceNote: string;
+  priceMonthly: string | null;
 };
 
 function hashToXY(id: string): { x: number; y: number } {
@@ -107,28 +114,9 @@ function gpuFromAttributes(attrs: unknown): string {
   return "";
 }
 
-function formatDenomLabel(denom: string): string {
-  const d = denom.toLowerCase();
-  if (d === "uakt" || d.endsWith("akt")) return "AKT";
-  if (d.startsWith("ibc/")) return "IBC";
-  return denom.length > 12 ? `${denom.slice(0, 10)}…` : denom;
-}
-
-function formatPriceAmount(amount: string, denom: string): { line: string; note: string } {
-  const n = Number(amount);
-  if (!Number.isFinite(n)) return { line: `${amount} ${formatDenomLabel(denom)}`, note: "per block" };
-  const label = formatDenomLabel(denom);
-  if (denom.toLowerCase() === "uakt" || denom.toLowerCase().endsWith("akt")) {
-    const akt = n / 1_000_000;
-    return {
-      line: `${akt < 0.01 ? akt.toFixed(6) : akt.toFixed(4)} ${label}`,
-      note: "per block (LCD rate)",
-    };
-  }
-  return {
-    line: `${n < 1 ? n.toFixed(6) : n.toFixed(4)} ${label}`,
-    note: "per block (LCD rate)",
-  };
+function shortenAkashAddr(addr: string): string {
+  if (addr.length < 12) return addr;
+  return `${addr.slice(0, 10)}…${addr.slice(-4)}`;
 }
 
 function parseResourceGroup(entry: unknown): ParsedResource | null {
@@ -162,23 +150,25 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
 
   let price = "—";
   let priceNote = "";
+  let priceMonthly: string | null = null;
   if (o.price && typeof o.price === "object") {
     const p = o.price as { amount?: string; denom?: string };
     if (p.amount && p.denom) {
-      const fmt = formatPriceAmount(p.amount, p.denom);
-      price = fmt.line;
+      const fmt = formatAkashPrice(p.amount, p.denom);
+      price = fmt.perBlock;
       priceNote = fmt.note;
+      priceMonthly = fmt.monthlyEstimate;
     }
   }
 
-  const parts = [cpu, memory, gpu, storage].filter(Boolean);
   return {
     cpu,
     memory,
     storage,
-    gpu: gpu || (parts.some((p) => p.includes("GPU")) ? "GPU" : ""),
+    gpu: gpu || "",
     price,
     priceNote,
+    priceMonthly,
   };
 }
 
@@ -187,6 +177,7 @@ function parseOrder(raw: unknown): {
   state: string;
   title: string;
   orderRef: string;
+  provider: string;
   resource: ParsedResource;
 } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -194,11 +185,15 @@ function parseOrder(raw: unknown): {
 
   let id = "";
   let orderRef = "";
+  let provider = "";
   if (o.id && typeof o.id === "object") {
     const I = o.id as Record<string, unknown>;
     const dseq = String(I.dseq ?? "");
     const gseq = I.gseq;
     const oseq = I.oseq;
+    if (typeof I.owner === "string" && I.owner) {
+      provider = shortenAkashAddr(I.owner);
+    }
     orderRef = dseq ? `dseq ${dseq}` : "";
     if (typeof gseq === "number" && typeof oseq === "number") {
       id = `${dseq}-${gseq}-${oseq}`;
@@ -226,16 +221,21 @@ function parseOrder(raw: unknown): {
     gpu: "",
     price: "—",
     priceNote: "",
+    priceMonthly: null,
   };
 
   const title = displayTitle(rawName, resource, orderRef);
 
-  return { id, state, title, orderRef, resource };
+  return { id, state, title, orderRef, provider, resource };
 }
 
 function resourceSummary(r: ParsedResource): string {
   const parts = [r.gpu, r.cpu, r.memory, r.storage].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Compute (see order spec)";
+}
+
+function resourceChips(r: ParsedResource): string[] {
+  return [r.gpu, r.cpu, r.memory, r.storage].filter(Boolean);
 }
 
 function displayTitle(
@@ -246,9 +246,10 @@ function displayTitle(
   const generic =
     !rawName.trim() || /^akash$/i.test(rawName.trim()) || rawName.trim().length < 3;
   if (!generic) return rawName.trim();
+  if (r.gpu) return r.gpu.includes("NVIDIA") || r.gpu.includes("AMD") ? r.gpu : `GPU · ${r.gpu}`;
   const summary = resourceSummary(r);
   if (summary !== "Compute (see order spec)") {
-    return `Open bid · ${summary}`;
+    return summary.split(" · ")[0] ?? "Open bid";
   }
   return orderRef ? `Open bid · ${orderRef}` : "Akash open bid";
 }
@@ -277,7 +278,7 @@ export function ordersToMapNodes(orders: unknown[]): MapNode[] {
       label: p?.title ?? `Order ${i + 1}`,
       latency: latencyFromId(id),
       cost: r?.price ?? "—",
-      gpu: r?.gpu || resourceSummary(r ?? { cpu: "", memory: "", storage: "", gpu: "", price: "", priceNote: "" }),
+      gpu: r?.gpu || resourceSummary(r ?? { cpu: "", memory: "", storage: "", gpu: "", price: "", priceNote: "", priceMonthly: null }),
       provider: "Akash",
       raw,
     };
@@ -289,17 +290,22 @@ export function ordersToOfferCards(orders: unknown[], limit: number): OfferCard[
     const p = parseOrder(raw);
     if (!p) return [];
     const r = p.resource;
+    const chips = resourceChips(r);
     return [
       {
         id: p.id,
         title: p.title,
-        gpu: r.gpu || "CPU / general compute",
+        gpu: r.gpu || "CPU · general compute",
         resources: resourceSummary(r),
+        resourceChips: chips.length ? chips : ["Compute"],
         price: r.price,
         priceNote: r.priceNote,
-        badge: p.state === "open" ? "Open order" : p.state,
+        priceMonthly: r.priceMonthly,
+        badge: p.state === "open" ? "Open bid" : p.state,
         state: p.state,
         orderRef: p.orderRef,
+        provider: p.provider || "Akash network",
+        hasGpu: Boolean(r.gpu),
       },
     ];
   });

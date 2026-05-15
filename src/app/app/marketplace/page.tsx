@@ -7,28 +7,25 @@ export const metadata: Metadata = {
 
 export default function MarketplacePage() {
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex h-14 items-center border-b border-border-subtle bg-surface-elevated/80 px-6 backdrop-blur-md">
-        <h1 className="text-sm font-semibold text-text-primary">Marketplace</h1>
+    <div className="flex flex-1 flex-col bg-surface-base">
+      <header className="border-b border-border-subtle bg-surface-elevated/90 px-6 py-5 backdrop-blur-md">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Marketplace</p>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-text-primary">
+          Live Akash compute
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
+          Spot bids from Akash mainnet. Fund your wallet, then attach workloads from the terminal
+          after balances clear the gate.
+        </p>
       </header>
       <div className="p-6">
-        <p className="max-w-2xl text-sm text-text-secondary">
-          <strong className="font-medium text-text-primary">Live Akash bids</strong>{" "}
-          pulled from a public LCD (same feed as the dashboard). Reserve capacity, fund your
-          wallet, then attach workloads from the terminal after you clear the balance gate.
-        </p>
-        <h2 className="mt-8 text-xs font-semibold uppercase tracking-wider text-text-muted">
-          Live spot bids
-        </h2>
-        <div className="mt-4">
-          <LiveAkashOffers
-            reserveHref="/app/terminal"
-            reserveLabel="Use with terminal"
-            offerQueryParam
-            limit={12}
-            showSource={false}
-          />
-        </div>
+        <LiveAkashOffers
+          reserveHref="/app/terminal"
+          reserveLabel="Use with terminal"
+          offerQueryParam
+          limit={12}
+          showSource={false}
+        />
       </div>
     </div>
   );

@@ -11,14 +11,14 @@ export function OffersSection() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Live offers
+              Live marketplace
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-              Spot capacity on the mesh
+              Real Akash spot bids — mainnet prices
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
-              Open orders from the Akash mainnet LCD — GPU, CPU, memory, and block
-              rates pulled live (no placeholder inventory).
+              Open orders from the Akash LCD with GPU specs, vCPU, memory, and per-block
+              rates. Every card is parsed from chain data — not demo inventory.
             </p>
           </div>
           <Button variant="secondary" className="shrink-0" asChild>
