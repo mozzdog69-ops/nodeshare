@@ -9,17 +9,23 @@ export async function register() {
     process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
   if (!isProd) return;
 
-  const required = [
-    "ETH_RPC_URL",
-    "NEXT_PUBLIC_ETH_RPC_URL",
-    "ETHERSCAN_API_KEY",
-    "NEXT_PUBLIC_APP_URL",
-  ] as const;
+  const required = ["ETHERSCAN_API_KEY", "NEXT_PUBLIC_APP_URL"] as const;
   const missing = required.filter((k) => !process.env[k]?.trim());
   if (missing.length > 0) {
     console.warn(
       "[NodeShare] Production missing env (on-chain live features degraded):",
       missing.join(", "),
+    );
+  }
+  const hasRpc =
+    process.env.ETH_RPC_URL?.trim() || process.env.NEXT_PUBLIC_ETH_RPC_URL?.trim();
+  if (!hasRpc) {
+    console.warn(
+      "[NodeShare] No ETH_RPC_URL or NEXT_PUBLIC_ETH_RPC_URL — balances and sends will fail.",
+    );
+  } else if (!process.env.ETH_RPC_URL?.trim()) {
+    console.warn(
+      "[NodeShare] ETH_RPC_URL unset — server will fall back to NEXT_PUBLIC_ETH_RPC_URL.",
     );
   }
   if (!process.env.RENDER_API_KEY?.trim()) {

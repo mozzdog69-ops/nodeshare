@@ -2,17 +2,26 @@ import { NextResponse } from "next/server";
 import { getChainId, getUsdcAddress, getUsdtAddress } from "@/lib/chain/config";
 import { readErc20Balance, readNativeBalance } from "@/lib/chain/erc20";
 import { normalizeHexAddress } from "@/lib/chain/normalize-address";
-import { friendlyRpcError, validateEthRpcUrl } from "@/lib/chain/rpc-url";
+import {
+  friendlyRpcError,
+  resolveEthRpcUrl,
+  validateEthRpcUrl,
+} from "@/lib/chain/rpc-url";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const raw = searchParams.get("address") ?? "";
-  const rpcCheck = validateEthRpcUrl(process.env.ETH_RPC_URL);
+  const { raw: rpcRaw, source: rpcSource } = resolveEthRpcUrl();
+  const rpcCheck = validateEthRpcUrl(rpcRaw);
   if (!rpcCheck.ok) {
     return NextResponse.json(
-      { ok: false, error: rpcCheck.error, data: null },
+      {
+        ok: false,
+        error: rpcCheck.error,
+        data: { rpcSource },
+      },
       { status: 503 },
     );
   }
