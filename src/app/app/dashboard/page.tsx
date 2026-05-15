@@ -1,8 +1,8 @@
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardLiveBalances } from "@/components/dashboard/dashboard-live-balances";
 import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
-import { LiveOpsPanel } from "@/components/dashboard/live-ops-panel";
 import { MeshStatusBadge } from "@/components/dashboard/mesh-status-badge";
+import { LiveAkashOffers } from "@/components/marketplace/live-akash-offers";
 import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -48,11 +48,29 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        <section>
-          <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-accent">
-            Live infrastructure
-          </h2>
-          <LiveOpsPanel />
+        <section className="rounded-[var(--radius-lg)] border border-border-subtle bg-white p-6 shadow-card">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-accent">
+                Rent a GPU
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-text-secondary">
+                Live Akash bids from mainnet: GPU specs, per-block rate, and an hourly estimate (~6s
+                blocks). Same feed as the marketplace — pick a card, then use the terminal after you
+                fund.
+              </p>
+            </div>
+            <Button variant="secondary" className="shrink-0" asChild>
+              <Link href="/app/marketplace">Browse all offers</Link>
+            </Button>
+          </div>
+          <LiveAkashOffers
+            reserveHref="/app/terminal"
+            reserveLabel="Use with terminal"
+            offerQueryParam
+            limit={6}
+            showSource={false}
+          />
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
