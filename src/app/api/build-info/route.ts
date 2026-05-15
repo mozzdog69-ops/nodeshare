@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
+  pickWorkingEthRpcUrlFromProcessEnv,
   probeEthRpc,
-  resolveEthRpcUrl,
-  validateEthRpcUrl,
+  sanitizeEnvUrl,
 } from "@/lib/chain/rpc-url";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
  * Open: https://YOUR_SITE/api/build-info
  */
 export async function GET() {
-  const resolved = resolveEthRpcUrl();
-  const rpc = validateEthRpcUrl(resolved.raw);
-  const probe = rpc.ok ? await probeEthRpc(rpc.url) : null;
+  const rpcPick = pickWorkingEthRpcUrlFromProcessEnv();
+  const probe = rpcPick.ok ? await probeEthRpc(rpcPick.url) : null;
+  const serverRaw = sanitizeEnvUrl(process.env.ETH_RPC_URL);
+  const serverLooksIncomplete =
+    Boolean(serverRaw) && /\/v2\/?$/.test(serverRaw.replace(/\s+$/, ""));
 
   return NextResponse.json({
     git:
@@ -31,8 +33,13 @@ export async function GET() {
       ? "set (static/IPFS calls this origin for /api)"
       : "unset (same-origin /api)",
     env: {
-      ethRpcSource: resolved.source ?? "none",
-      ethRpcUrl: rpc.ok ? "configured" : rpc.error,
+      ethRpcSource: rpcPick.ok ? rpcPick.source : "none",
+      ethRpcUrl: rpcPick.ok ? "configured" : rpcPick.error,
+      ethRpcUsingPublicFallback: rpcPick.ok ? Boolean(rpcPick.usedFallbackFromPublic) : false,
+      ethRpcHint:
+        serverLooksIncomplete && rpcPick.ok
+          ? "ETH_RPC_URL ends at /v2/ with no API key segment — Netlify still shows it as set. Paste the full Alchemy HTTPS URL (key after /v2/) or leave ETH_RPC_URL empty to use only NEXT_PUBLIC_ETH_RPC_URL."
+          : null,
       ethRpcProbe: probe
         ? probe.ok
           ? { ok: true, chainId: probe.chainId }

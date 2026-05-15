@@ -33,6 +33,68 @@ export function resolveEthRpcUrl(): ReturnType<typeof resolveEthRpcUrlFromEnv> {
   });
 }
 
+/**
+ * Prefer ETH_RPC_URL; if it is missing or invalid (e.g. ends at `/v2/` with no key), use
+ * NEXT_PUBLIC_ETH_RPC_URL so Netlify mistakes do not break /api/chain/balances.
+ */
+export function pickWorkingEthRpcUrl(env: {
+  ETH_RPC_URL?: string;
+  NEXT_PUBLIC_ETH_RPC_URL?: string;
+}):
+  | {
+      ok: true;
+      url: string;
+      source: "ETH_RPC_URL" | "NEXT_PUBLIC_ETH_RPC_URL";
+      /** Present when server var was set but invalid and public URL was used. */
+      usedFallbackFromPublic?: boolean;
+    }
+  | { ok: false; error: string } {
+  const serverRaw = sanitizeEnvUrl(env.ETH_RPC_URL);
+  const publicRaw = sanitizeEnvUrl(env.NEXT_PUBLIC_ETH_RPC_URL);
+
+  if (serverRaw) {
+    const v = validateEthRpcUrl(serverRaw);
+    if (v.ok) {
+      return { ok: true, url: v.url, source: "ETH_RPC_URL" };
+    }
+  }
+
+  if (publicRaw) {
+    const v = validateEthRpcUrl(publicRaw);
+    if (v.ok) {
+      const serverInvalid = Boolean(serverRaw && !validateEthRpcUrl(serverRaw).ok);
+      return {
+        ok: true,
+        url: v.url,
+        source: "NEXT_PUBLIC_ETH_RPC_URL",
+        usedFallbackFromPublic: serverInvalid,
+      };
+    }
+  }
+
+  if (serverRaw) {
+    const v = validateEthRpcUrl(serverRaw);
+    return { ok: false, error: v.ok ? "Invalid ETH_RPC_URL" : v.error };
+  }
+  if (publicRaw) {
+    const v = validateEthRpcUrl(publicRaw);
+    return { ok: false, error: v.ok ? "Invalid NEXT_PUBLIC_ETH_RPC_URL" : v.error };
+  }
+
+  return {
+    ok: false,
+    error:
+      "No Ethereum RPC URL on the server. Set ETH_RPC_URL or NEXT_PUBLIC_ETH_RPC_URL to the full Alchemy HTTPS URL including the API key after /v2/, then redeploy.",
+  };
+}
+
+export function pickWorkingEthRpcUrlFromProcessEnv(): ReturnType<typeof pickWorkingEthRpcUrl> {
+  return pickWorkingEthRpcUrl({
+    ETH_RPC_URL: process.env.ETH_RPC_URL,
+    NEXT_PUBLIC_ETH_RPC_URL: process.env.NEXT_PUBLIC_ETH_RPC_URL,
+  });
+}
+
 export function validateEthRpcUrl(
   raw: string | undefined,
 ): { ok: true; url: string } | { ok: false; error: string } {

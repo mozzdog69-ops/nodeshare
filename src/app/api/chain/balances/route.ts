@@ -4,8 +4,7 @@ import { readErc20Balance, readNativeBalance } from "@/lib/chain/erc20";
 import { normalizeHexAddress } from "@/lib/chain/normalize-address";
 import {
   friendlyRpcError,
-  resolveEthRpcUrl,
-  validateEthRpcUrl,
+  pickWorkingEthRpcUrlFromProcessEnv,
 } from "@/lib/chain/rpc-url";
 
 export const dynamic = "force-dynamic";
@@ -13,19 +12,18 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const raw = searchParams.get("address") ?? "";
-  const { raw: rpcRaw, source: rpcSource } = resolveEthRpcUrl();
-  const rpcCheck = validateEthRpcUrl(rpcRaw);
-  if (!rpcCheck.ok) {
+  const rpcPick = pickWorkingEthRpcUrlFromProcessEnv();
+  if (!rpcPick.ok) {
     return NextResponse.json(
       {
         ok: false,
-        error: rpcCheck.error,
-        data: { rpcSource },
+        error: rpcPick.error,
+        data: null,
       },
       { status: 503 },
     );
   }
-  const rpc = rpcCheck.url;
+  const rpc = rpcPick.url;
 
   let address: string;
   try {
