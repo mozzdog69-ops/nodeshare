@@ -7,11 +7,21 @@ Next.js **API routes** (`/api/chain/*`, `/api/render/*`, …) need a **Node serv
 
 ---
 
-## Step A — API deployment (Vercel)
+## Step A — API deployment (Vercel or Netlify)
+
+**Vercel**
 
 1. Push this repo to GitHub and import it in [Vercel](https://vercel.com).
-2. Add all env vars from `.env.example` (at least RPC + Etherscan + `NEXT_PUBLIC_APP_URL`).
+2. Add all env vars from `.env.example` (at least `ETH_RPC_URL`, Etherscan, `NEXT_PUBLIC_APP_URL`).
 3. Deploy. Copy the production URL, e.g. `https://nodeshare-xxxxx.vercel.app`.
+
+**Netlify** (same app + `/api/*`)
+
+1. [Netlify](https://www.netlify.com/) → Add new site → Import from Git → pick this repo.
+2. Build settings are read from **`netlify.toml`** (`npm run build` + `@netlify/plugin-nextjs`).
+3. Add the **same** env vars as Vercel (including **`ETH_RPC_URL`** server-side; `NEXT_PUBLIC_*` as needed).
+4. Deploy. Copy the URL, e.g. `https://nodeshare.netlify.app`.
+5. For IPFS, set `NEXT_PUBLIC_API_BASE` to **this** HTTPS origin (not the IPFS gateway).
 
 ---
 

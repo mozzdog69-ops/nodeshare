@@ -1,0 +1,19 @@
+# Full Next.js (App Router + /api/*) on Netlify — same split as Vercel + IPFS.
+# https://docs.netlify.com/frameworks/next-js/overview/
+#
+# Netlify UI: Site → Environment variables (same keys as .env.example).
+# IPFS export: set NEXT_PUBLIC_API_BASE=https://YOUR_SITE.netlify.app (no slash).
+
+[build]
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Match vercel.json — static IPFS site calls this origin for /api/*
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
