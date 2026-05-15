@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const raw = searchParams.get("address") ?? "";
-  const rpc = process.env.ETH_RPC_URL;
+  const rpc = process.env.ETH_RPC_URL?.trim();
 
   if (!rpc) {
     return NextResponse.json(
