@@ -1,0 +1,33 @@
+
+v0-nodeshare
+7
+NEXT_PUBLIC_API_BASE
+Sensitive
+Production and Preview	
+May 4
+
+NEXT_PUBLIC_APP_URL
+Sensitive
+Production and Preview	
+May 4
+
+NEXT_PUBLIC_CHAIN_ID
+Sensitive
+Production and Preview	
+May 4
+
+CHAIN_ID
+Sensitive
+Production and Preview	
+May 4
+
+ETHERSCAN_API_KEY
+Sensitive
+Production and Preview	
+May 4
+
+NEXT_PUBLIC_ETH_RPC_URL
+Sensitive
+Production and Preview	
+May 4
+

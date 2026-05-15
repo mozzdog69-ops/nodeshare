@@ -95,6 +95,56 @@ export function pickWorkingEthRpcUrlFromProcessEnv(): ReturnType<typeof pickWork
   });
 }
 
+/** Length of the path segment after `/v2/` or `/v3/` (0 = missing key). No secret returned. */
+export function rpcApiKeySegmentLength(url: string): number {
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    const v2 = parts.indexOf("v2");
+    if (v2 >= 0 && parts[v2 + 1]) return parts[v2 + 1]!.length;
+    const v3 = parts.indexOf("v3");
+    if (v3 >= 0 && parts[v3 + 1]) return parts[v3 + 1]!.length;
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+export type RpcEnvDiagnostics = {
+  set: boolean;
+  host: string | null;
+  /** Characters in API key segment after /v2/ or /v3/. Alchemy keys are usually ~32. */
+  apiKeySegmentLength: number;
+  valid: boolean;
+  invalidReason: string | null;
+};
+
+export function describeRpcEnvVar(raw: string | undefined): RpcEnvDiagnostics {
+  const url = sanitizeEnvUrl(raw);
+  if (!url) {
+    return {
+      set: false,
+      host: null,
+      apiKeySegmentLength: 0,
+      valid: false,
+      invalidReason: "not set",
+    };
+  }
+  const v = validateEthRpcUrl(url);
+  let host: string | null = null;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    host = null;
+  }
+  return {
+    set: true,
+    host,
+    apiKeySegmentLength: rpcApiKeySegmentLength(url),
+    valid: v.ok,
+    invalidReason: v.ok ? null : v.error,
+  };
+}
+
 export function validateEthRpcUrl(
   raw: string | undefined,
 ): { ok: true; url: string } | { ok: false; error: string } {
@@ -183,7 +233,7 @@ export async function probeEthRpc(
 export function friendlyRpcError(message: string): string {
   const m = message.replace(/https?:\/\/[^\s"'<>]+/gi, "[RPC URL hidden]");
   if (/401|must be authenticated|unauthorized/i.test(message)) {
-    return `${m} — Alchemy rejected the key. In Vercel/Netlify set ETH_RPC_URL to the full https://eth-mainnet.g.alchemy.com/v2/<key> (no quotes). Use the same value for NEXT_PUBLIC_ETH_RPC_URL. Redeploy after saving.`;
+    return `${m} — Alchemy rejected the key. In Netlify set ETH_RPC_URL to the full https://eth-mainnet.g.alchemy.com/v2/<key> (no quotes). Use the same value for NEXT_PUBLIC_ETH_RPC_URL. Redeploy after saving.`;
   }
   if (/403|forbidden/i.test(message)) {
     return `${m} — Check Alchemy app/network (Ethereum mainnet) and that the key is active.`;

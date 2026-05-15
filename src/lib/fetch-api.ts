@@ -17,7 +17,7 @@ export async function fetchApiJson<T>(pathWithQuery: string): Promise<
     return {
       ok: false,
       status: 0,
-      error: `${msg}. Static/IPFS builds need NEXT_PUBLIC_API_BASE pointing at the deployment that serves /api (e.g. Vercel).`,
+      error: `${msg}. Static/IPFS builds need NEXT_PUBLIC_API_BASE pointing at your Netlify deployment that serves /api.`,
     };
   }
 

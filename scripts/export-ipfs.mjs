@@ -2,7 +2,7 @@
  * Produces ./out for IPFS pinning (static HTML export).
  * Copies src/app/api away and deletes it — API routes cannot exist in static export.
  *
- * Set NEXT_PUBLIC_API_BASE to your full Next deployment (Vercel) that still serves /api/*.
+ * Set NEXT_PUBLIC_API_BASE to your Netlify deployment URL that still serves /api/*.
  *
  * Usage:  npm run export:ipfs
  */

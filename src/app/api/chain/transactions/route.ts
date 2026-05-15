@@ -89,7 +89,7 @@ export async function GET(req: Request) {
       {
         ok: false,
         error:
-          "ETHERSCAN_API_KEY missing — create a key at etherscan.io/myapikey (unified V2). Paste into Vercel with no quotes/spaces, then redeploy.",
+          "ETHERSCAN_API_KEY missing — create a key at etherscan.io/myapikey (unified V2). Paste into Netlify with no quotes/spaces, then redeploy.",
         data: { transfers: [] as unknown[] },
       },
       { status: 503 },

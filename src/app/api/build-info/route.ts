@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  describeRpcEnvVar,
   pickWorkingEthRpcUrlFromProcessEnv,
   probeEthRpc,
   sanitizeEnvUrl,
@@ -14,9 +15,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const rpcPick = pickWorkingEthRpcUrlFromProcessEnv();
   const probe = rpcPick.ok ? await probeEthRpc(rpcPick.url) : null;
-  const serverRaw = sanitizeEnvUrl(process.env.ETH_RPC_URL);
-  const serverLooksIncomplete =
-    Boolean(serverRaw) && /\/v2\/?$/.test(serverRaw.replace(/\s+$/, ""));
+  const serverSanitized = sanitizeEnvUrl(process.env.ETH_RPC_URL);
+  const publicSanitized = sanitizeEnvUrl(process.env.NEXT_PUBLIC_ETH_RPC_URL);
+  const serverDiag = describeRpcEnvVar(process.env.ETH_RPC_URL);
+  const publicDiag = describeRpcEnvVar(process.env.NEXT_PUBLIC_ETH_RPC_URL);
 
   return NextResponse.json({
     git:
@@ -36,10 +38,14 @@ export async function GET() {
       ethRpcSource: rpcPick.ok ? rpcPick.source : "none",
       ethRpcUrl: rpcPick.ok ? "configured" : rpcPick.error,
       ethRpcUsingPublicFallback: rpcPick.ok ? Boolean(rpcPick.usedFallbackFromPublic) : false,
-      ethRpcHint:
-        serverLooksIncomplete && rpcPick.ok
-          ? "ETH_RPC_URL ends at /v2/ with no API key segment — Netlify still shows it as set. Paste the full Alchemy HTTPS URL (key after /v2/) or leave ETH_RPC_URL empty to use only NEXT_PUBLIC_ETH_RPC_URL."
-          : null,
+      ethRpcSanitizedValuesMatch:
+        serverSanitized.length > 0 &&
+        publicSanitized.length > 0 &&
+        serverSanitized === publicSanitized,
+      ethRpcDiagnostics: {
+        ETH_RPC_URL: serverDiag,
+        NEXT_PUBLIC_ETH_RPC_URL: publicDiag,
+      },
       ethRpcProbe: probe
         ? probe.ok
           ? { ok: true, chainId: probe.chainId }

@@ -1,4 +1,4 @@
-# Full Next.js (App Router + /api/*) on Netlify — same split as Vercel + IPFS.
+# Full Next.js (App Router + /api/*) on Netlify — optional IPFS static front (see IPFS_ENS.md).
 # https://docs.netlify.com/frameworks/next-js/overview/
 #
 # Netlify UI: Site → Environment variables (same keys as .env.example).
@@ -10,7 +10,7 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Match vercel.json — static IPFS site calls this origin for /api/*
+# CORS for static IPFS / *.eth.limo sites calling this origin for /api/*
 [[headers]]
   for = "/api/*"
   [headers.values]
