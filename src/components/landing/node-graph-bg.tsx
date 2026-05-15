@@ -46,22 +46,18 @@ export function NodeGraphBg({ variant = "hero" }: { variant?: "hero" | "light" }
       className="pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden
       initial={{ opacity: 0 }}
-      animate={{ opacity: isHero ? 0.7 : 0.45 }}
-      transition={{ duration: 1.2 }}
+      animate={{ opacity: isHero ? 1 : 0.5 }}
+      transition={{ duration: 1 }}
     >
       <svg
-        className={
-          isHero
-            ? "h-full w-full text-accent-hero/50"
-            : "h-full w-full text-accent/35"
-        }
+        className="h-full w-full text-accent/40"
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid slice"
       >
         <defs>
-          <linearGradient id="pulse" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="pulse-red" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
-            <stop offset="50%" stopColor="currentColor" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="currentColor" stopOpacity="0.85" />
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -77,23 +73,23 @@ export function NodeGraphBg({ variant = "hero" }: { variant?: "hero" | "light" }
                 x2={b.x}
                 y2={b.y}
                 stroke="currentColor"
-                strokeWidth={0.15}
-                opacity={0.35}
+                strokeWidth={0.12}
+                opacity={0.25}
               />
               <motion.line
                 x1={a.x}
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                stroke="url(#pulse)"
-                strokeWidth={0.28}
-                initial={{ opacity: 0.15 }}
-                animate={{ opacity: [0.15, 0.85, 0.15] }}
+                stroke="url(#pulse-red)"
+                strokeWidth={0.22}
+                initial={{ opacity: 0.1 }}
+                animate={{ opacity: [0.1, 0.7, 0.1] }}
                 transition={{
                   duration: 2.8,
                   repeat: Infinity,
                   ease: "easeInOut",
-                  delay: i * 0.22,
+                  delay: i * 0.2,
                 }}
               />
             </g>
@@ -105,8 +101,8 @@ export function NodeGraphBg({ variant = "hero" }: { variant?: "hero" | "light" }
             cx={n.x}
             cy={n.y}
             r={n.r}
-            className={isHero ? "fill-accent-hero/90" : "fill-accent/70"}
-            animate={{ scale: [1, 1.08, 1], opacity: [0.75, 1, 0.75] }}
+            className="fill-accent"
+            animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.95, 0.5] }}
             transition={{
               duration: 3.5 + i * 0.2,
               repeat: Infinity,
@@ -115,16 +111,7 @@ export function NodeGraphBg({ variant = "hero" }: { variant?: "hero" | "light" }
           />
         ))}
       </svg>
-      <motion.div
-        className={
-          isHero
-            ? "absolute inset-0 bg-gradient-to-b from-surface-hero via-surface-hero/95 to-surface-base"
-            : "absolute inset-0 bg-gradient-to-b from-surface-base via-transparent to-surface-base"
-        }
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-      />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-white" />
     </motion.div>
   );
 }

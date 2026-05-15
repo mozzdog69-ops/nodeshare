@@ -43,17 +43,16 @@ export function MeshStatusBadge() {
   return (
     <span
       className={cn(
-        "rounded-full border px-3 py-1 text-xs font-medium",
-        tone === "live" &&
-          "border-success-muted bg-success-muted text-success",
-        tone === "empty" &&
-          "border-border-subtle bg-surface-base text-text-muted",
-        tone === "error" &&
-          "border-amber-200 bg-amber-50 text-amber-900",
-        tone === "pending" &&
-          "border-border-subtle bg-surface-base text-text-muted",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold",
+        tone === "live" && "border-accent/30 bg-surface-accent text-accent",
+        tone === "empty" && "border-border-subtle bg-surface-subtle text-text-muted",
+        tone === "error" && "border-amber-200 bg-warning-muted text-warning",
+        tone === "pending" && "border-border-subtle bg-white text-text-muted",
       )}
     >
+      {tone === "live" ? (
+        <span className="size-1.5 rounded-full bg-live animate-pulse" aria-hidden />
+      ) : null}
       {label}
     </span>
   );

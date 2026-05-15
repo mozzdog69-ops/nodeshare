@@ -6,19 +6,19 @@ import { LiveAkashOffers } from "@/components/marketplace/live-akash-offers";
 
 export function OffersSection() {
   return (
-    <section className="relative z-10 border-t border-border-subtle bg-surface-band py-16 sm:py-20">
+    <section className="relative z-10 border-y border-border-accent bg-surface-band py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-6 border-l-4 border-accent pl-6 sm:flex-row sm:items-end sm:justify-between sm:pl-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Live marketplace
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-accent">
+              Marketplace
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-              Real Akash spot bids — mainnet prices
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+              Live Akash spot bids
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
-              Open orders from the Akash LCD with GPU specs, vCPU, memory, and per-block
-              rates. Every card is parsed from chain data — not demo inventory.
+            <p className="mt-3 max-w-xl text-base leading-relaxed text-text-secondary">
+              Real GPU, CPU, and memory specs with per-block pricing from the Akash mainnet
+              LCD — refreshed on every load.
             </p>
           </div>
           <Button variant="secondary" className="shrink-0" asChild>
@@ -26,7 +26,7 @@ export function OffersSection() {
           </Button>
         </div>
 
-        <div className="mt-10">
+        <div className="mt-12">
           <LiveAkashOffers
             reserveHref="/login"
             reserveLabel="Unlock to reserve"

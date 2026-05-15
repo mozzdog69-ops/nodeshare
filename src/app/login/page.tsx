@@ -79,7 +79,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface-base px-6 py-12">
+    <div className="flex min-h-screen flex-col bg-white px-6 py-12">
+      <div className="fixed left-0 right-0 top-0 h-1 bg-accent" aria-hidden />
       <div className="mx-auto w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <NodeShareLogo size="nav" href="/" />

@@ -5,7 +5,6 @@ import { APP_NAV_ITEMS } from "@/components/layout/nav-config";
 import { useWalletSession } from "@/context/wallet-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -21,10 +20,12 @@ export function Sidebar() {
   const { ethAddress, lockSession } = useWalletSession();
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-border-subtle bg-surface-elevated/80 backdrop-blur-md lg:flex">
-      <div className="flex min-h-14 flex-col justify-center gap-1 border-b border-border-subtle px-4 py-3">
-        <NodeShareLogo size="sidebar" href="/" />
-        <p className="text-[11px] text-text-muted">Decentralized AI compute</p>
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-border-subtle bg-white lg:flex">
+      <div className="border-b border-border-subtle px-5 py-5">
+        <NodeShareLogo size="sidebar" href="/app/dashboard" />
+        <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-accent">
+          Console
+        </p>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
         {APP_NAV_ITEMS.map((item) => {
@@ -36,27 +37,20 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "relative block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-[var(--radius-md)] border-l-[3px] px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "text-text-primary"
-                  : "text-text-secondary hover:bg-black/[0.03] hover:text-text-primary",
+                  ? "border-accent bg-surface-accent text-accent"
+                  : "border-transparent text-text-secondary hover:bg-surface-subtle hover:text-text-primary",
               )}
             >
-              {active && (
-                <motion.span
-                  layoutId="sidebar-active"
-                  className="absolute inset-0 rounded-lg bg-accent-muted"
-                  transition={{ type: "spring", stiffness: 380, damping: 34 }}
-                />
-              )}
-              <span className="relative z-10">{item.label}</span>
+              {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="border-t border-border-subtle p-3 space-y-2">
+      <div className="space-y-2 border-t border-border-subtle p-4">
         {ethAddress ? (
-          <p className="rounded-lg bg-surface-base px-3 py-2 font-mono text-[11px] text-text-secondary">
+          <p className="rounded-[var(--radius-md)] border border-border-subtle bg-surface-subtle px-3 py-2 font-mono text-[11px] text-text-secondary">
             {shortAddr(ethAddress)}
           </p>
         ) : null}
@@ -72,9 +66,9 @@ export function Sidebar() {
         </Button>
         <Link
           href="/"
-          className="block rounded-lg px-3 py-2 text-sm text-text-muted transition-colors hover:bg-black/[0.03] hover:text-text-secondary"
+          className="block rounded-[var(--radius-md)] px-3 py-2 text-center text-xs text-text-muted transition-colors hover:bg-surface-accent hover:text-accent"
         >
-          ← Landing
+          ← Marketing site
         </Link>
       </div>
     </aside>

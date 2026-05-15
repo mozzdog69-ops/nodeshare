@@ -24,10 +24,10 @@ function OfferSkeleton() {
       <motion.div className="h-4 w-20 rounded-full bg-surface-base" />
       <div className="mt-4 h-5 w-3/4 rounded bg-surface-base" />
       <motion.div className="mt-3 h-4 w-1/2 rounded bg-surface-base" />
-      <motion.div className="mt-4 flex gap-2">
-        <div className="h-6 w-16 rounded-full bg-surface-base" />
-        <div className="h-6 w-16 rounded-full bg-surface-base" />
-      </motion.div>
+      <div className="mt-4 flex gap-2">
+        <div className="h-6 w-16 rounded-full bg-surface-subtle" />
+        <div className="h-6 w-16 rounded-full bg-surface-subtle" />
+      </div>
       <div className="mt-6 h-8 w-28 rounded bg-surface-base" />
     </div>
   );
@@ -70,14 +70,14 @@ function OfferCardView({
         interactive
         className={cn(
           "h-full overflow-hidden border-border-subtle bg-surface-elevated shadow-card transition-shadow hover:shadow-card-hover",
-          o.hasGpu && "ring-1 ring-accent/10",
+          o.hasGpu && "border-t-2 border-t-accent",
         )}
       >
         <CardContent className="flex h-full flex-col p-0">
           <div
             className={cn(
               "border-b border-border-subtle px-5 py-3",
-              o.hasGpu ? "bg-gradient-to-r from-accent-muted/80 to-transparent" : "bg-surface-base/50",
+              o.hasGpu ? "bg-surface-accent" : "bg-surface-subtle",
             )}
           >
             <div className="flex items-center justify-between gap-2">

@@ -2,59 +2,63 @@
 @import "@xterm/xterm/css/xterm.css";
 
 :root {
-  /* Surfaces — clean slate + white (no muddy mid-gray bands) */
-  --surface-base: #f8fafc;
+  /* White + red — crisp, high-contrast */
+  --surface-base: #ffffff;
+  --surface-subtle: #fafafa;
   --surface-elevated: #ffffff;
-  --surface-band: #ffffff;
-  --surface-hero: #0f172a;
-  --surface-glass: rgba(255, 255, 255, 0.88);
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.14);
-  --border-hero: rgba(255, 255, 255, 0.1);
+  --surface-band: #fffafa;
+  --surface-hero: #ffffff;
+  --surface-accent: #fef2f2;
+  --surface-glass: rgba(255, 255, 255, 0.92);
 
-  /* Text */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-hero: #f8fafc;
-  --text-hero-muted: #94a3b8;
+  --border-subtle: #eeeeee;
+  --border-strong: #e0e0e0;
+  --border-accent: rgba(220, 38, 38, 0.22);
+  --border-hero: rgba(220, 38, 38, 0.12);
 
-  /* Accent — rose (readable on light + hero) */
-  --accent: #e11d48;
-  --accent-hover: #be123c;
-  --accent-muted: rgba(225, 29, 72, 0.1);
-  --accent-glow: rgba(251, 113, 133, 0.45);
-  --accent-hero: #fb7185;
+  --text-primary: #0a0a0a;
+  --text-secondary: #404040;
+  --text-muted: #737373;
+  --text-hero: #0a0a0a;
+  --text-hero-muted: #525252;
 
-  /* Semantic */
-  --success: #16a34a;
-  --success-muted: rgba(22, 163, 74, 0.12);
-  --warning: #d97706;
-  --warning-muted: rgba(217, 119, 6, 0.12);
-  --live: #22c55e;
+  --accent: #dc2626;
+  --accent-hover: #b91c1c;
+  --accent-muted: #fef2f2;
+  --accent-glow: rgba(220, 38, 38, 0.28);
+  --accent-hero: #dc2626;
 
-  /* Terminal island */
-  --terminal-bg: #0c0f14;
-  --terminal-fg: #e2e8f0;
-  --terminal-dim: #64748b;
-  --terminal-accent: #fb7185;
+  --success: #15803d;
+  --success-muted: #f0fdf4;
+  --warning: #b45309;
+  --warning-muted: #fffbeb;
+  --live: #dc2626;
+
+  --terminal-bg: #0a0a0a;
+  --terminal-fg: #fafafa;
+  --terminal-dim: #a3a3a3;
+  --terminal-accent: #f87171;
   --terminal-success: #4ade80;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.06);
-  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(225, 29, 72, 0.08);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 12px 32px rgba(220, 38, 38, 0.1), 0 0 0 1px var(--border-accent);
+  --shadow-red: 0 4px 24px rgba(220, 38, 38, 0.18);
 }
 
 @theme inline {
   --color-surface-base: var(--surface-base);
+  --color-surface-subtle: var(--surface-subtle);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-band: var(--surface-band);
   --color-surface-hero: var(--surface-hero);
+  --color-surface-accent: var(--surface-accent);
   --color-surface-glass: var(--surface-glass);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
+  --color-border-accent: var(--border-accent);
   --color-border-hero: var(--border-hero);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -82,12 +86,10 @@
 @keyframes pulse-glow {
   0%,
   100% {
-    opacity: 0.35;
-    filter: blur(12px);
+    opacity: 0.2;
   }
   50% {
-    opacity: 0.65;
-    filter: blur(16px);
+    opacity: 0.45;
   }
 }
 
@@ -95,10 +97,10 @@
   0%,
   100% {
     transform: scale(1);
-    opacity: 0.85;
+    opacity: 0.7;
   }
   50% {
-    transform: scale(1.04);
+    transform: scale(1.05);
     opacity: 1;
   }
 }
@@ -152,7 +154,7 @@ body {
 
 ::selection {
   background: var(--accent-muted);
-  color: var(--text-primary);
+  color: var(--accent-hover);
 }
 
 .xterm {
@@ -160,4 +162,13 @@ body {
 }
 .xterm-viewport {
   border-radius: var(--radius-md);
+}
+
+/* Subtle red grid for marketing sections */
+.bg-mesh-pattern {
+  background-color: var(--surface-base);
+  background-image:
+    linear-gradient(to right, rgba(220, 38, 38, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(220, 38, 38, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
 }

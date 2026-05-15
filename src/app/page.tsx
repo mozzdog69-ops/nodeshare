@@ -5,61 +5,83 @@ import { NodeGraphBg } from "@/components/landing/node-graph-bg";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
+const features = [
+  { title: "Live Akash bids", desc: "GPU specs & on-chain spot rates" },
+  { title: "ETH + stablecoins", desc: "USDC / USDT balances & history" },
+  { title: "Balance-gated terminal", desc: "Run workloads after you fund" },
+] as const;
+
 export default function LandingPage() {
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-surface-base">
-      <div className="relative bg-surface-hero text-text-hero">
-        <NodeGraphBg variant="hero" />
-        <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-          <NodeShareLogo size="nav" className="brightness-0 invert" />
-          <nav className="flex items-center gap-3">
+    <div className="flex min-h-screen flex-col bg-surface-base">
+      <div className="h-1 w-full bg-accent" aria-hidden />
+
+      <header className="sticky top-0 z-20 border-b border-border-subtle bg-surface-glass backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <NodeShareLogo size="nav" href="/" />
+          <nav className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/network"
-              className="hidden text-sm font-medium text-text-hero-muted transition-colors hover:text-text-hero sm:inline"
+              className="hidden px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-accent sm:inline"
             >
-              View network
+              Network
             </Link>
-            <Button className="px-5 shadow-lg shadow-accent/20" asChild>
+            <Button variant="ghost" className="hidden sm:inline-flex" asChild>
+              <Link href="/login">Sign in</Link>
+            </Button>
+            <Button className="px-5 shadow-[var(--shadow-red)]" asChild>
               <Link href="/login">Launch app</Link>
             </Button>
           </nav>
-        </header>
+        </div>
+      </header>
 
-        <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 pb-16 pt-8 sm:pb-20 sm:pt-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-hero">
-            Decentralized AI compute OS
+      <section className="relative overflow-hidden bg-mesh-pattern">
+        <NodeGraphBg variant="hero" />
+        <div className="relative z-10 mx-auto max-w-6xl px-6 pb-20 pt-16 sm:pb-28 sm:pt-24">
+          <p className="inline-flex items-center gap-2 rounded-full border border-border-accent bg-surface-accent px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accent">
+            <span className="size-1.5 rounded-full bg-live" />
+            Akash mainnet · live data
           </p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-text-hero sm:text-5xl sm:leading-[1.08]">
-            Decentralized compute for AI workloads
+          <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-tight text-text-primary sm:text-6xl sm:leading-[1.05]">
+            Decentralized compute
+            <span className="text-accent"> for AI</span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-text-hero-muted">
-            Rent GPUs. Run AI in a terminal. Pay with crypto. No traditional cloud
-            lock-in — control that feels like AWS, infrastructure that behaves like
-            the open web.
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary">
+            Rent GPUs on Akash. Pay with crypto. Operate from a terminal that feels like
+            a cloud console — without locking you into one vendor.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
-            <Button className="px-8 py-3.5 text-base shadow-lg shadow-accent/25" asChild>
-              <Link href="/login">Launch app</Link>
+            <Button className="px-8 py-3.5 text-base" asChild>
+              <Link href="/login">Get started</Link>
             </Button>
-            <Button
-              variant="secondary"
-              className="border-border-hero bg-white/10 px-8 py-3.5 text-base text-text-hero hover:bg-white/15"
-              asChild
-            >
-              <Link href="/network">View network</Link>
+            <Button variant="secondary" className="px-8 py-3.5 text-base" asChild>
+              <Link href="/app/marketplace">Browse live offers</Link>
             </Button>
           </div>
-        </main>
-      </div>
+
+          <ul className="mt-16 grid gap-4 sm:grid-cols-3">
+            {features.map((f) => (
+              <li
+                key={f.title}
+                className="rounded-[var(--radius-lg)] border border-border-subtle bg-surface-elevated p-5 shadow-card"
+              >
+                <p className="text-sm font-semibold text-text-primary">{f.title}</p>
+                <p className="mt-1 text-sm text-text-muted">{f.desc}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
       <OffersSection />
 
-      <div className="relative z-10 mt-auto border-t border-border-subtle bg-surface-elevated">
-        <TrustStrip />
-        <footer className="mx-auto max-w-6xl px-6 py-8 text-center text-xs text-text-muted">
-          NodeShare — decentralized AI compute on Akash and Ethereum.
-        </footer>
-      </div>
+      <TrustStrip />
+      <footer className="border-t border-border-subtle bg-surface-subtle py-10">
+        <p className="text-center text-sm text-text-muted">
+          NodeShare — decentralized compute on Akash & Ethereum
+        </p>
+      </footer>
     </div>
   );
 }
