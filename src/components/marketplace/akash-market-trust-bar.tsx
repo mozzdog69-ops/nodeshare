@@ -23,8 +23,6 @@ export function AkashMarketTrustBar({ orderCount, className = "" }: Props) {
       </span>
       <span className="hidden h-3 w-px bg-border-strong sm:inline" aria-hidden />
       <span className="font-medium">Live LCD prices</span>
-      <span className="hidden h-3 w-px bg-border-strong sm:inline" aria-hidden />
-      <span>No demo inventory</span>
       {orderCount != null && orderCount > 0 ? (
         <>
           <span className="hidden h-3 w-px bg-border-strong sm:inline" aria-hidden />

@@ -15,16 +15,15 @@ export type MapNode = {
 export type OfferCard = {
   id: string;
   title: string;
-  gpu: string;
   resources: string;
   resourceChips: string[];
   price: string;
   priceNote: string;
+  priceHourly: string | null;
   priceMonthly: string | null;
   badge: string;
   state: string;
   orderRef: string;
-  provider: string;
   hasGpu: boolean;
 };
 
@@ -35,6 +34,7 @@ type ParsedResource = {
   gpu: string;
   price: string;
   priceNote: string;
+  priceHourly: string | null;
   priceMonthly: string | null;
 };
 
@@ -150,6 +150,7 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
 
   let price = "—";
   let priceNote = "";
+  let priceHourly: string | null = null;
   let priceMonthly: string | null = null;
   if (o.price && typeof o.price === "object") {
     const p = o.price as { amount?: string; denom?: string };
@@ -157,6 +158,7 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
       const fmt = formatAkashPrice(p.amount, p.denom);
       price = fmt.perBlock;
       priceNote = fmt.note;
+      priceHourly = fmt.hourlyEstimate;
       priceMonthly = fmt.monthlyEstimate;
     }
   }
@@ -168,6 +170,7 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
     gpu: gpu || "",
     price,
     priceNote,
+    priceHourly,
     priceMonthly,
   };
 }
@@ -221,6 +224,7 @@ function parseOrder(raw: unknown): {
     gpu: "",
     price: "—",
     priceNote: "",
+    priceHourly: null,
     priceMonthly: null,
   };
 
@@ -243,15 +247,17 @@ function displayTitle(
   r: ParsedResource,
   orderRef: string,
 ): string {
+  const dseq = orderRef.match(/dseq\s+(\d+)/)?.[1];
   const generic =
     !rawName.trim() || /^akash$/i.test(rawName.trim()) || rawName.trim().length < 3;
   if (!generic) return rawName.trim();
-  if (r.gpu) return r.gpu.includes("NVIDIA") || r.gpu.includes("AMD") ? r.gpu : `GPU · ${r.gpu}`;
+  if (dseq) return `Spot bid · dseq ${dseq}`;
+  if (r.gpu) return "GPU spot bid";
   const summary = resourceSummary(r);
   if (summary !== "Compute (see order spec)") {
     return summary.split(" · ")[0] ?? "Open bid";
   }
-  return orderRef ? `Open bid · ${orderRef}` : "Akash open bid";
+  return orderRef || "Akash open bid";
 }
 
 function orderId(raw: unknown, index: number): string {
@@ -278,7 +284,7 @@ export function ordersToMapNodes(orders: unknown[]): MapNode[] {
       label: p?.title ?? `Order ${i + 1}`,
       latency: latencyFromId(id),
       cost: r?.price ?? "—",
-      gpu: r?.gpu || resourceSummary(r ?? { cpu: "", memory: "", storage: "", gpu: "", price: "", priceNote: "", priceMonthly: null }),
+      gpu: r?.gpu || resourceSummary(r ?? { cpu: "", memory: "", storage: "", gpu: "", price: "", priceNote: "", priceHourly: null, priceMonthly: null }),
       provider: "Akash",
       raw,
     };
@@ -295,16 +301,15 @@ export function ordersToOfferCards(orders: unknown[], limit: number): OfferCard[
       {
         id: p.id,
         title: p.title,
-        gpu: r.gpu || "CPU · general compute",
         resources: resourceSummary(r),
         resourceChips: chips.length ? chips : ["Compute"],
         price: r.price,
         priceNote: r.priceNote,
+        priceHourly: r.priceHourly,
         priceMonthly: r.priceMonthly,
         badge: p.state === "open" ? "Open bid" : p.state,
         state: p.state,
         orderRef: p.orderRef,
-        provider: p.provider || "Akash network",
         hasGpu: Boolean(r.gpu),
       },
     ];

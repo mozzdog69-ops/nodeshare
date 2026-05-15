@@ -95,27 +95,34 @@ function OfferCardView({
             <h3 className="text-base font-semibold leading-snug tracking-tight text-text-primary">
               {o.title}
             </h3>
-            <p className="mt-1 font-mono text-[10px] text-text-muted">
-              Provider {o.provider}
-            </p>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {o.resourceChips.map((chip) => (
-                <ResourceChip key={chip} label={chip} highlight={chip.includes("GPU") || chip.includes("NVIDIA")} />
+              {o.resourceChips.map((chip, idx) => (
+                <ResourceChip
+                  key={`${o.id}-${chip}-${idx}`}
+                  label={chip}
+                  highlight={chip.includes("GPU") || chip.includes("NVIDIA") || chip.includes("AMD")}
+                />
               ))}
             </div>
 
             <div className="mt-5 rounded-lg border border-border-subtle bg-surface-base/80 px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-                Spot rate
+              {o.priceHourly ? (
+                <p className="font-mono text-2xl font-bold tabular-nums tracking-tight text-accent">
+                  {o.priceHourly}
+                </p>
+              ) : null}
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                LCD spot (per block)
               </p>
-              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight text-accent">
+              <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-text-primary">
                 {o.price}
               </p>
               <p className="mt-0.5 text-[11px] text-text-secondary">{o.priceNote}</p>
               {o.priceMonthly ? (
-                <p className="mt-2 border-t border-border-subtle pt-2 text-xs font-medium text-text-primary">
-                  {o.priceMonthly}
+                <p className="mt-2 border-t border-border-subtle pt-2 text-xs text-text-muted">
+                  {o.priceMonthly}{" "}
+                  <span className="text-[10px]">(~6s blocks, illustrative)</span>
                 </p>
               ) : null}
             </div>
@@ -279,8 +286,8 @@ export function LiveAkashOffers({
           </div>
 
           <p className="text-center text-[11px] text-text-muted">
-            Spot rates are on-chain bid prices per block. Monthly figures are estimates (~6s blocks) — confirm on
-            Akash before deploying production workloads.
+            Hourly and monthly figures assume ~6s blocks on Akash — multiply per-block rate by
+            LCD data. Confirm with Akash Console before production commitments.
           </p>
         </>
       )}

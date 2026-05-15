@@ -185,9 +185,14 @@ export function LiveOpsPanel() {
                   >
                     <p className="font-medium text-text-primary">{o.title}</p>
                     <p className="mt-0.5 text-xs text-text-secondary">{o.resources}</p>
-                    <p className="mt-1 font-mono text-sm font-semibold text-accent">{o.price}</p>
+                    <p className="mt-1 font-mono text-sm font-semibold text-accent">
+                      {o.priceHourly ?? o.price}
+                    </p>
+                    {o.priceHourly ? (
+                      <p className="mt-0.5 font-mono text-xs text-text-muted">{o.price} · block</p>
+                    ) : null}
                     {o.priceMonthly ? (
-                      <p className="mt-0.5 text-[10px] font-medium text-text-secondary">{o.priceMonthly}</p>
+                      <p className="mt-0.5 text-[10px] text-text-muted">{o.priceMonthly}</p>
                     ) : null}
                     <p className="mt-0.5 text-[10px] text-text-muted">{o.orderRef}</p>
                   </li>

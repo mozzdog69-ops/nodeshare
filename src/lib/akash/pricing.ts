@@ -1,5 +1,7 @@
-/** ~6s average block time on Akash mainnet (estimate for spot-rate math). */
-export const AKASH_BLOCKS_PER_MONTH = Math.floor((30 * 24 * 3600) / 6);
+/** ~6s average block time on Akash mainnet (LCD / spot-rate estimates). */
+export const AKASH_AVG_BLOCK_SECONDS = 6;
+export const AKASH_BLOCKS_PER_HOUR = Math.floor(3600 / AKASH_AVG_BLOCK_SECONDS);
+export const AKASH_BLOCKS_PER_MONTH = Math.floor((30 * 24 * 3600) / AKASH_AVG_BLOCK_SECONDS);
 
 /** Canonical mainnet IBC USDC on Akash (common denom). */
 export const AKASH_IBC_USDC =
@@ -20,6 +22,7 @@ export function formatDenomLabel(denom: string): string {
 export type FormattedPrice = {
   perBlock: string;
   note: string;
+  hourlyEstimate: string | null;
   monthlyEstimate: string | null;
 };
 
@@ -27,16 +30,26 @@ export function formatAkashPrice(amount: string, denom: string): FormattedPrice 
   const n = Number(amount);
   const label = formatDenomLabel(denom);
   if (!Number.isFinite(n)) {
-    return { perBlock: `${amount} ${label}`, note: "per block · Akash LCD", monthlyEstimate: null };
+    return {
+      perBlock: `${amount} ${label}`,
+      note: "per block · Akash LCD",
+      hourlyEstimate: null,
+      monthlyEstimate: null,
+    };
   }
 
   const d = denom.toLowerCase();
   if (d === "uakt" || d.endsWith("akt")) {
     const perBlock = n / 1_000_000;
+    const hourly = perBlock * AKASH_BLOCKS_PER_HOUR;
     const monthly = perBlock * AKASH_BLOCKS_PER_MONTH;
     return {
       perBlock: `${perBlock < 0.0001 ? perBlock.toFixed(8) : perBlock < 0.01 ? perBlock.toFixed(6) : perBlock.toFixed(4)} AKT`,
       note: "per block · mainnet LCD",
+      hourlyEstimate:
+        hourly < 0.0001
+          ? `~${hourly.toFixed(8)} AKT / hr (est.)`
+          : `~${hourly < 0.01 ? hourly.toFixed(6) : hourly.toFixed(4)} AKT / hr (est.)`,
       monthlyEstimate:
         monthly < 0.01
           ? `~${monthly.toFixed(6)} AKT / mo (est.)`
@@ -46,10 +59,12 @@ export function formatAkashPrice(amount: string, denom: string): FormattedPrice 
 
   if (isUsdcIbcDenom(denom)) {
     const perBlock = n / 1_000_000;
+    const hourly = perBlock * AKASH_BLOCKS_PER_HOUR;
     const monthly = perBlock * AKASH_BLOCKS_PER_MONTH;
     return {
       perBlock: `$${perBlock < 0.0001 ? perBlock.toFixed(8) : perBlock < 0.01 ? perBlock.toFixed(6) : perBlock.toFixed(4)}`,
       note: "USDC per block · mainnet LCD",
+      hourlyEstimate: `~$${hourly < 0.0001 ? hourly.toFixed(6) : hourly < 0.01 ? hourly.toFixed(4) : hourly.toFixed(2)} / hr (est.)`,
       monthlyEstimate: `~$${monthly < 1 ? monthly.toFixed(4) : monthly.toFixed(2)} / mo (est.)`,
     };
   }
@@ -59,6 +74,7 @@ export function formatAkashPrice(amount: string, denom: string): FormattedPrice 
     return {
       perBlock: `${perBlock < 1 ? perBlock.toFixed(6) : perBlock.toFixed(4)} ${label}`,
       note: "per block · IBC · mainnet LCD",
+      hourlyEstimate: null,
       monthlyEstimate: null,
     };
   }
@@ -66,6 +82,7 @@ export function formatAkashPrice(amount: string, denom: string): FormattedPrice 
   return {
     perBlock: `${n < 1 ? n.toFixed(6) : n.toFixed(4)} ${label}`,
     note: "per block · mainnet LCD",
+    hourlyEstimate: null,
     monthlyEstimate: null,
   };
 }
