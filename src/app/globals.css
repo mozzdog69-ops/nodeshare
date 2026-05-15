@@ -2,31 +2,38 @@
 @import "@xterm/xterm/css/xterm.css";
 
 :root {
-  /* Surfaces — near-white, soft gray (Stripe-like) */
-  --surface-base: #f6f7f9;
+  /* Surfaces — clean slate + white (no muddy mid-gray bands) */
+  --surface-base: #f8fafc;
   --surface-elevated: #ffffff;
-  --surface-glass: rgba(255, 255, 255, 0.72);
+  --surface-band: #ffffff;
+  --surface-hero: #0f172a;
+  --surface-glass: rgba(255, 255, 255, 0.88);
   --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --border-hero: rgba(255, 255, 255, 0.1);
 
-  /* Text — graphite / slate */
+  /* Text */
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
+  --text-hero: #f8fafc;
+  --text-hero-muted: #94a3b8;
 
-  /* Accent — deep crimson (not scam-red) */
+  /* Accent — rose (readable on light + hero) */
   --accent: #e11d48;
   --accent-hover: #be123c;
-  --accent-muted: rgba(225, 29, 72, 0.12);
-  --accent-glow: rgba(225, 29, 72, 0.35);
+  --accent-muted: rgba(225, 29, 72, 0.1);
+  --accent-glow: rgba(251, 113, 133, 0.45);
+  --accent-hero: #fb7185;
 
   /* Semantic */
-  --success: #22c55e;
-  --success-muted: rgba(34, 197, 94, 0.14);
-  --warning: #f59e0b;
-  --warning-muted: rgba(245, 158, 11, 0.16);
+  --success: #16a34a;
+  --success-muted: rgba(22, 163, 74, 0.12);
+  --warning: #d97706;
+  --warning-muted: rgba(217, 119, 6, 0.12);
+  --live: #22c55e;
 
-  /* Terminal island (dark inside light UI) */
+  /* Terminal island */
   --terminal-bg: #0c0f14;
   --terminal-fg: #e2e8f0;
   --terminal-dim: #64748b;
@@ -36,28 +43,33 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 8px 24px rgba(15, 23, 42, 0.06);
-  --shadow-card-hover: 0 4px 12px rgba(225, 29, 72, 0.08),
-    0 16px 40px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(225, 29, 72, 0.08);
 }
 
 @theme inline {
   --color-surface-base: var(--surface-base);
   --color-surface-elevated: var(--surface-elevated);
+  --color-surface-band: var(--surface-band);
+  --color-surface-hero: var(--surface-hero);
   --color-surface-glass: var(--surface-glass);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
+  --color-border-hero: var(--border-hero);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+  --color-text-hero: var(--text-hero);
+  --color-text-hero-muted: var(--text-hero-muted);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-muted: var(--accent-muted);
+  --color-accent-hero: var(--accent-hero);
   --color-success: var(--success);
   --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
   --color-warning-muted: var(--warning-muted);
+  --color-live: var(--live);
   --color-terminal-bg: var(--terminal-bg);
   --color-terminal-fg: var(--terminal-fg);
   --color-terminal-dim: var(--terminal-dim);
@@ -143,7 +155,6 @@ body {
   color: var(--text-primary);
 }
 
-/* xterm tweaks inside our shell */
 .xterm {
   padding: 12px;
 }

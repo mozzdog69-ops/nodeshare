@@ -177,11 +177,6 @@ export function LiveOpsPanel() {
                 {akash.count}{" "}
                 <span className="text-sm font-normal text-text-muted">open orders (page)</span>
               </p>
-              {akash.source ? (
-                <p className="mt-1 font-mono text-[10px] text-text-muted break-all">
-                  {akash.source}
-                </p>
-              ) : null}
               <ul className="mt-3 space-y-2 text-sm">
                 {ordersToOfferCards(akash.sample, 3).map((o) => (
                   <li
@@ -189,8 +184,9 @@ export function LiveOpsPanel() {
                     className="rounded-lg border border-border-subtle bg-surface-base px-3 py-2"
                   >
                     <p className="font-medium text-text-primary">{o.title}</p>
-                    <p className="mt-0.5 text-xs text-text-secondary">{o.gpu}</p>
+                    <p className="mt-0.5 text-xs text-text-secondary">{o.resources}</p>
                     <p className="mt-1 font-mono text-sm text-accent">{o.price}</p>
+                    <p className="mt-0.5 text-[10px] text-text-muted">{o.orderRef}</p>
                   </li>
                 ))}
               </ul>

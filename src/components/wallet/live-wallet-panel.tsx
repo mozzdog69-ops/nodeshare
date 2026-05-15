@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchApiJson } from "@/lib/fetch-api";
+import { friendlyRpcError } from "@/lib/chain/rpc-url";
 import { useWalletSession } from "@/context/wallet-session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -75,7 +76,7 @@ export function LiveWalletPanel() {
     } else {
       const bJson = bGot.body;
       if (bJson.ok && bJson.data) setBalances(bJson.data);
-      else setBalErr(bJson.error ?? "Could not load balances");
+      else setBalErr(friendlyRpcError(bJson.error ?? "Could not load balances"));
     }
 
     if (!tGot.ok) {

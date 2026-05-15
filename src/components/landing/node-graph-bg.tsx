@@ -19,7 +19,7 @@ const links: [string, string][] = [
   ["h", "d"],
 ];
 
-export function NodeGraphBg() {
+export function NodeGraphBg({ variant = "hero" }: { variant?: "hero" | "light" }) {
   const nodes = useMemo<Node[]>(
     () => [
       { id: "a", x: 18, y: 42, r: 3.2 },
@@ -39,13 +39,22 @@ export function NodeGraphBg() {
     [nodes],
   );
 
+  const isHero = variant === "hero";
+
   return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.55]"
+    <motion.div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isHero ? 0.7 : 0.45 }}
+      transition={{ duration: 1.2 }}
     >
       <svg
-        className="h-full w-full text-accent/40"
+        className={
+          isHero
+            ? "h-full w-full text-accent-hero/50"
+            : "h-full w-full text-accent/35"
+        }
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid slice"
       >
@@ -96,7 +105,7 @@ export function NodeGraphBg() {
             cx={n.x}
             cy={n.y}
             r={n.r}
-            className="fill-accent/80"
+            className={isHero ? "fill-accent-hero/90" : "fill-accent/70"}
             animate={{ scale: [1, 1.08, 1], opacity: [0.75, 1, 0.75] }}
             transition={{
               duration: 3.5 + i * 0.2,
@@ -106,7 +115,16 @@ export function NodeGraphBg() {
           />
         ))}
       </svg>
-      <div className="absolute inset-0 bg-gradient-to-b from-surface-base via-transparent to-surface-base" />
-    </div>
+      <motion.div
+        className={
+          isHero
+            ? "absolute inset-0 bg-gradient-to-b from-surface-hero via-surface-hero/95 to-surface-base"
+            : "absolute inset-0 bg-gradient-to-b from-surface-base via-transparent to-surface-base"
+        }
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+      />
+    </motion.div>
   );
 }

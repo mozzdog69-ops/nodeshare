@@ -10,6 +10,27 @@ export type MapNode = {
   raw: unknown;
 };
 
+export type OfferCard = {
+  id: string;
+  title: string;
+  gpu: string;
+  resources: string;
+  price: string;
+  priceNote: string;
+  badge: string;
+  state: string;
+  orderRef: string;
+};
+
+type ParsedResource = {
+  cpu: string;
+  memory: string;
+  storage: string;
+  gpu: string;
+  price: string;
+  priceNote: string;
+};
+
 function hashToXY(id: string): { x: number; y: number } {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) {
@@ -17,111 +38,269 @@ function hashToXY(id: string): { x: number; y: number } {
     h = Math.imul(h, 16777619);
   }
   const u = h >>> 0;
-  const x = 10 + (u % 1000) / 1000 * 80;
-  const y = 12 + ((u >> 10) % 1000) / 1000 * 72;
+  const x = 10 + ((u % 1000) / 1000) * 80;
+  const y = 12 + (((u >> 10) % 1000) / 1000) * 72;
   return { x, y };
 }
 
-function pickGpuHint(s: string): string {
-  const m =
-    s.match(/nvidia[^"\\]{0,48}/i) ??
-    s.match(/NVIDIA[^"\\]{0,48}/) ??
-    s.match(/A100|A10|H100|L40|RTX|mi250|tesla/i);
-  if (m) return m[0]!.replace(/[",\\]+/g, "").slice(0, 40);
-  if (s.toLowerCase().includes("gpu")) return "GPU (see order spec)";
-  return "GPU / CPU (Akash order)";
+function readUnits(val: unknown): number | null {
+  if (val == null) return null;
+  if (typeof val === "number" && Number.isFinite(val)) return val;
+  if (typeof val === "object" && val !== null && "val" in val) {
+    const v = (val as { val?: unknown }).val;
+    if (typeof v === "string") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (typeof v === "number") return v;
+  }
+  if (typeof val === "string") {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
-function pickPrice(s: string, raw: unknown): string {
-  if (raw && typeof raw === "object" && "price" in raw) {
-    const p = (raw as { price?: { amount?: string; denom?: string } }).price;
-    if (p?.amount && p?.denom) {
-      const amt = Number(p.amount);
-      if (Number.isFinite(amt) && p.denom === "uakt") {
-        return `${(amt / 1_000_000).toFixed(3)} AKT / block (est.)`;
-      }
-      return `${p.amount} ${p.denom}`;
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const gb = bytes / 1_073_741_824;
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
+  const mb = bytes / 1_048_576;
+  return `${mb.toFixed(0)} MB`;
+}
+
+function formatCpu(units: number | null): string {
+  if (units == null || units <= 0) return "";
+  const cores = units / 1000;
+  if (cores >= 1) {
+    return `${cores % 1 === 0 ? cores.toFixed(0) : cores.toFixed(1)} vCPU`;
+  }
+  return `${units} mCPU`;
+}
+
+function gpuFromAttributes(attrs: unknown): string {
+  if (!Array.isArray(attrs)) return "";
+  for (const a of attrs) {
+    if (!a || typeof a !== "object") continue;
+    const o = a as { key?: string; value?: string };
+    const key = (o.key ?? "").trim();
+    const val = (o.value ?? "").trim();
+    const keyL = key.toLowerCase();
+
+    const modelInKey = key.match(/model\/([^/]+)/i)?.[1];
+    if (modelInKey) {
+      if (modelInKey === "*" || modelInKey === "any") return "NVIDIA GPU (any model)";
+      return `NVIDIA ${modelInKey.replace(/\*/g, "").trim()}`;
+    }
+
+    if (keyL.includes("vendor/nvidia") || keyL.includes("nvidia")) {
+      if (val && val !== "true" && !/^\*+$/.test(val)) return `NVIDIA ${val}`;
+      return "NVIDIA GPU";
+    }
+    if (keyL.includes("vendor/amd") || keyL.includes("amd")) return "AMD GPU";
+
+    const blob = `${key} ${val}`;
+    const named =
+      blob.match(/\b(A100|A10|H100|L40S?|RTX\s*\d+|Tesla\s*\w+|MI250)\b/i)?.[0];
+    if (named) return `NVIDIA ${named}`;
+  }
+  return "";
+}
+
+function formatDenomLabel(denom: string): string {
+  const d = denom.toLowerCase();
+  if (d === "uakt" || d.endsWith("akt")) return "AKT";
+  if (d.startsWith("ibc/")) return "IBC";
+  return denom.length > 12 ? `${denom.slice(0, 10)}…` : denom;
+}
+
+function formatPriceAmount(amount: string, denom: string): { line: string; note: string } {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return { line: `${amount} ${formatDenomLabel(denom)}`, note: "per block" };
+  const label = formatDenomLabel(denom);
+  if (denom.toLowerCase() === "uakt" || denom.toLowerCase().endsWith("akt")) {
+    const akt = n / 1_000_000;
+    return {
+      line: `${akt < 0.01 ? akt.toFixed(6) : akt.toFixed(4)} ${label}`,
+      note: "per block (LCD rate)",
+    };
+  }
+  return {
+    line: `${n < 1 ? n.toFixed(6) : n.toFixed(4)} ${label}`,
+    note: "per block (LCD rate)",
+  };
+}
+
+function parseResourceGroup(entry: unknown): ParsedResource | null {
+  if (!entry || typeof entry !== "object") return null;
+  const o = entry as Record<string, unknown>;
+  const resource = o.resource;
+  if (!resource || typeof resource !== "object") return null;
+  const r = resource as Record<string, unknown>;
+
+  const cpu = formatCpu(readUnits(r.cpu && typeof r.cpu === "object" ? (r.cpu as { units?: unknown }).units : null));
+  const memUnits =
+    r.memory && typeof r.memory === "object"
+      ? readUnits((r.memory as { quantity?: unknown }).quantity)
+      : null;
+  const memory = memUnits != null ? formatBytes(memUnits) : "";
+
+  let storage = "";
+  if (Array.isArray(r.storage) && r.storage[0] && typeof r.storage[0] === "object") {
+    const sq = readUnits((r.storage[0] as { quantity?: unknown }).quantity);
+    if (sq != null) storage = formatBytes(sq);
+  }
+
+  let gpu = "";
+  if (r.gpu && typeof r.gpu === "object") {
+    const g = r.gpu as { units?: unknown; attributes?: unknown };
+    const units = readUnits(g.units);
+    const label = gpuFromAttributes(g.attributes);
+    if (label) gpu = units != null && units > 1 ? `${label} ×${units}` : label;
+    else if (units != null && units > 0) gpu = `${units} GPU`;
+  }
+
+  let price = "—";
+  let priceNote = "";
+  if (o.price && typeof o.price === "object") {
+    const p = o.price as { amount?: string; denom?: string };
+    if (p.amount && p.denom) {
+      const fmt = formatPriceAmount(p.amount, p.denom);
+      price = fmt.line;
+      priceNote = fmt.note;
     }
   }
-  const m = s.match(/"amount"\s*:\s*"(\d+)"\s*,\s*"denom"\s*:\s*"uakt"/);
-  if (m) {
-    return `${(Number(m[1]) / 1_000_000).toFixed(3)} AKT / block (est.)`;
+
+  const parts = [cpu, memory, gpu, storage].filter(Boolean);
+  return {
+    cpu,
+    memory,
+    storage,
+    gpu: gpu || (parts.some((p) => p.includes("GPU")) ? "GPU" : ""),
+    price,
+    priceNote,
+  };
+}
+
+function parseOrder(raw: unknown): {
+  id: string;
+  state: string;
+  title: string;
+  orderRef: string;
+  resource: ParsedResource;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+
+  let id = "";
+  let orderRef = "";
+  if (o.id && typeof o.id === "object") {
+    const I = o.id as Record<string, unknown>;
+    const dseq = String(I.dseq ?? "");
+    const gseq = I.gseq;
+    const oseq = I.oseq;
+    orderRef = dseq ? `dseq ${dseq}` : "";
+    if (typeof gseq === "number" && typeof oseq === "number") {
+      id = `${dseq}-${gseq}-${oseq}`;
+      orderRef = `dseq ${dseq} · g${gseq} · o${oseq}`;
+    } else if ("oid" in I) {
+      id = String(I.oid);
+    }
   }
-  return "See LCD order";
+  if (!id) return null;
+
+  const state = String(o.state ?? "open");
+  let rawName = "";
+  const spec = o.spec;
+  if (spec && typeof spec === "object") {
+    const name = (spec as { name?: string }).name;
+    if (name && name.trim()) rawName = name.trim();
+  }
+
+  const resources = spec && typeof spec === "object" ? (spec as { resources?: unknown }).resources : null;
+  const first = Array.isArray(resources) ? parseResourceGroup(resources[0]) : null;
+  const resource: ParsedResource = first ?? {
+    cpu: "",
+    memory: "",
+    storage: "",
+    gpu: "",
+    price: "—",
+    priceNote: "",
+  };
+
+  const title = displayTitle(rawName, resource, orderRef);
+
+  return { id, state, title, orderRef, resource };
+}
+
+function resourceSummary(r: ParsedResource): string {
+  const parts = [r.gpu, r.cpu, r.memory, r.storage].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Compute (see order spec)";
+}
+
+function displayTitle(
+  rawName: string,
+  r: ParsedResource,
+  orderRef: string,
+): string {
+  const generic =
+    !rawName.trim() || /^akash$/i.test(rawName.trim()) || rawName.trim().length < 3;
+  if (!generic) return rawName.trim();
+  const summary = resourceSummary(r);
+  if (summary !== "Compute (see order spec)") {
+    return `Open bid · ${summary}`;
+  }
+  return orderRef ? `Open bid · ${orderRef}` : "Akash open bid";
 }
 
 function orderId(raw: unknown, index: number): string {
-  if (raw && typeof raw === "object" && "id" in raw) {
-    const id = (raw as { id?: unknown }).id;
-    if (id && typeof id === "object") {
-      const o = id as Record<string, unknown>;
-      if ("oid" in o) return String(o.oid ?? index);
-      const dseq = o.dseq;
-      const gseq = o.gseq;
-      const oseq = o.oseq;
-      if (
-        (typeof dseq === "string" || typeof dseq === "number") &&
-        typeof gseq === "number" &&
-        typeof oseq === "number"
-      ) {
-        return `${dseq}-${gseq}-${oseq}`;
-      }
-    }
-    if (typeof id === "string" || typeof id === "number") return String(id);
-  }
-  return `akash-order-${index}`;
+  const p = parseOrder(raw);
+  return p?.id ?? `akash-order-${index}`;
 }
 
-/** Deterministic fake latency label from id (no geo in LCD). */
 function latencyFromId(id: string): string {
   let n = 0;
   for (let i = 0; i < id.length; i++) n = (n + id.charCodeAt(i) * (i + 1)) % 97;
-  return `${18 + (n % 55)} ms (mesh est.)`;
+  return `${18 + (n % 55)} ms (est.)`;
 }
 
-/**
- * Turn raw LCD order JSON into map nodes + card rows.
- */
 export function ordersToMapNodes(orders: unknown[]): MapNode[] {
   return orders.map((raw, i) => {
-    const id = orderId(raw, i);
+    const p = parseOrder(raw);
+    const id = p?.id ?? orderId(raw, i);
     const { x, y } = hashToXY(id);
-    const s = JSON.stringify(raw);
+    const r = p?.resource;
     return {
       id,
       x,
       y,
-      label: `Bid ${i + 1}`,
+      label: p?.title ?? `Order ${i + 1}`,
       latency: latencyFromId(id),
-      cost: pickPrice(s, raw),
-      gpu: pickGpuHint(s),
+      cost: r?.price ?? "—",
+      gpu: r?.gpu || resourceSummary(r ?? { cpu: "", memory: "", storage: "", gpu: "", price: "", priceNote: "" }),
       provider: "Akash",
       raw,
     };
   });
 }
 
-export type OfferCard = {
-  id: string;
-  title: string;
-  gpu: string;
-  price: string;
-  badge: string;
-  slots: number;
-};
-
 export function ordersToOfferCards(orders: unknown[], limit: number): OfferCard[] {
-  const slice = orders.slice(0, limit);
-  return slice.map((raw, i) => {
-    const id = orderId(raw, i);
-    const s = JSON.stringify(raw);
-    return {
-      id,
-      title: `Akash open order #${i + 1}`,
-      gpu: pickGpuHint(s),
-      price: pickPrice(s, raw),
-      badge: "Akash mesh",
-      slots: 1,
-    };
+  return orders.slice(0, limit).flatMap((raw) => {
+    const p = parseOrder(raw);
+    if (!p) return [];
+    const r = p.resource;
+    return [
+      {
+        id: p.id,
+        title: p.title,
+        gpu: r.gpu || "CPU / general compute",
+        resources: resourceSummary(r),
+        price: r.price,
+        priceNote: r.priceNote,
+        badge: p.state === "open" ? "Open order" : p.state,
+        state: p.state,
+        orderRef: p.orderRef,
+      },
+    ];
   });
 }

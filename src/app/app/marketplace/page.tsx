@@ -26,6 +26,7 @@ export default function MarketplacePage() {
             reserveLabel="Use with terminal"
             offerQueryParam
             limit={12}
+            showSource={false}
           />
         </div>
       </div>

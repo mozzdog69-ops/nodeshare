@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchApiJson } from "@/lib/fetch-api";
+import { friendlyRpcError } from "@/lib/chain/rpc-url";
 import { useWalletSession } from "@/context/wallet-session";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,7 @@ export function DashboardLiveBalances() {
     }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`);
     if (!got.ok) {
       setData(null);
-      setErr(got.error);
+      setErr(friendlyRpcError(got.error));
       return;
     }
     const j = got.body;
@@ -41,7 +42,7 @@ export function DashboardLiveBalances() {
       setErr(null);
     } else {
       setData(null);
-      setErr(j.error ?? "Could not load balances");
+      setErr(friendlyRpcError(j.error ?? "Could not load balances"));
     }
   }, [ethAddress]);
 

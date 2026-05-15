@@ -2,24 +2,21 @@ import { NextResponse } from "next/server";
 import { getChainId, getUsdcAddress, getUsdtAddress } from "@/lib/chain/config";
 import { readErc20Balance, readNativeBalance } from "@/lib/chain/erc20";
 import { normalizeHexAddress } from "@/lib/chain/normalize-address";
+import { friendlyRpcError, validateEthRpcUrl } from "@/lib/chain/rpc-url";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const raw = searchParams.get("address") ?? "";
-  const rpc = process.env.ETH_RPC_URL?.trim();
-
-  if (!rpc) {
+  const rpcCheck = validateEthRpcUrl(process.env.ETH_RPC_URL);
+  if (!rpcCheck.ok) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: "ETH_RPC_URL is not set (server-side JSON-RPC for balances)",
-        data: null,
-      },
+      { ok: false, error: rpcCheck.error, data: null },
       { status: 503 },
     );
   }
+  const rpc = rpcCheck.url;
 
   let address: string;
   try {
@@ -55,7 +52,7 @@ export async function GET(req: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "RPC error";
     return NextResponse.json(
-      { ok: false, error: msg, data: null },
+      { ok: false, error: friendlyRpcError(msg), data: null },
       { status: 502 },
     );
   }
