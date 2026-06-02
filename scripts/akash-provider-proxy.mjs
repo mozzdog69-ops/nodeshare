@@ -19,6 +19,7 @@ const ALLOWED_ORIGINS = (
 
 function corsOk(origin) {
   if (!origin) return true;
+  if (/^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin)) return true;
   return ALLOWED_ORIGINS.some((o) => {
     if (o === "*" || o === origin) return true;
     if (o.includes("*.netlify.app") && /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin)) {

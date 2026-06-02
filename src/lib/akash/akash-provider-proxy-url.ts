@@ -20,6 +20,29 @@ export function isLocalhostProxyUrl(url: string): boolean {
   }
 }
 
+export function proxyHttpBaseUrl(proxyWs: string): string {
+  return proxyWs.replace(/^wss:/i, "https:").replace(/^ws:/i, "http:").replace(/\/$/, "");
+}
+
+/** Poll Render /health until awake (free tier cold start ~30–90s). */
+export async function wakeAkashProviderProxy(
+  proxyWs: string,
+  onStatus?: (message: string) => void,
+): Promise<boolean> {
+  const healthUrl = `${proxyHttpBaseUrl(proxyWs)}/health`;
+  for (let attempt = 1; attempt <= 18; attempt++) {
+    onStatus?.(`Waking proxy (${attempt}/18)…`);
+    try {
+      const res = await fetch(healthUrl, { cache: "no-store", mode: "cors" });
+      if (res.ok) return true;
+    } catch {
+      /* still spinning up */
+    }
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+  return false;
+}
+
 /** Resolve proxy WS URL from env strings; never return localhost on public deploys. */
 export function resolveProxyWsFromEnv(raw: string, siteHost?: string): string {
   const normalized = normalizeProxyWsUrl(raw);

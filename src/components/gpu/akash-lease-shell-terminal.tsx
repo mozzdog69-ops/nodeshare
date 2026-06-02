@@ -73,49 +73,70 @@ export function AkashLeaseShellTerminal({
     fit.fit();
 
     let welcomeWritten = false;
-    const shell = new AkashLeaseShellSession({
-      proxyWsUrl: proxyWs,
-      hostUri,
-      provider,
-      jwt,
-      dseq,
-      gseq,
-      oseq,
-      service,
-      onData: (text, code) => {
-        if (!welcomeWritten && code === LeaseShellCode.Stdout) {
-          welcomeWritten = true;
-          term.writeln("\r\n\x1b[38;2;248;113;113m● NodeShare\x1b[0m — GPU shell (Akash provider)");
-          term.writeln("");
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const shell = await AkashLeaseShellSession.connectWithWake({
+          proxyWsUrl: proxyWs,
+          hostUri,
+          provider,
+          jwt,
+          dseq,
+          gseq,
+          oseq,
+          service,
+          onStatus: (msg) => {
+            if (!cancelled) term.writeln(`\x1b[90m${msg}\x1b[0m`);
+          },
+          onData: (text, code) => {
+            if (!welcomeWritten && code === LeaseShellCode.Stdout) {
+              welcomeWritten = true;
+              term.writeln("\r\n\x1b[38;2;248;113;113m● NodeShare\x1b[0m — GPU shell (Akash provider)");
+              term.writeln("");
+            }
+            term.write(text);
+            setStatus("open");
+          },
+          onError: (msg) => {
+            setError(msg);
+            setStatus("error");
+            term.writeln(`\r\n\x1b[31m${msg}\x1b[0m`);
+          },
+          onClose: () => {
+            setStatus("closed");
+            term.writeln("\r\n\x1b[90m[session closed]\x1b[0m");
+          },
+        });
+        if (cancelled) {
+          shell.disconnect();
+          return;
         }
-        term.write(text);
-        setStatus("open");
-      },
-      onError: (msg) => {
-        setError(msg);
-        setStatus("error");
-        term.writeln(`\r\n\x1b[31m${msg}\x1b[0m`);
-      },
-      onClose: () => {
-        setStatus("closed");
-        term.writeln("\r\n\x1b[90m[session closed]\x1b[0m");
-      },
-    });
-    sessionRef.current = shell;
-    shell.connect();
+        sessionRef.current = shell;
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : "Could not connect to provider proxy.";
+          setError(msg);
+          setStatus("error");
+          term.writeln(`\r\n\x1b[31m${msg}\x1b[0m`);
+        }
+      }
+    })();
+
     term.writeln("\x1b[90mConnecting to your GPU on the provider…\x1b[0m");
 
-    term.onData((data) => shell.sendStdin(data));
+    term.onData((data) => sessionRef.current?.sendStdin(data));
     const onResize = () => {
       fit.fit();
-      shell.sendResize(term.cols, term.rows);
+      sessionRef.current?.sendResize(term.cols, term.rows);
     };
     window.addEventListener("resize", onResize);
     onResize();
 
     return () => {
+      cancelled = true;
       window.removeEventListener("resize", onResize);
-      shell.disconnect();
+      sessionRef.current?.disconnect();
       term.dispose();
     };
   }, [proxyWs, hostUri, provider, jwt, dseq, gseq, oseq, service]);

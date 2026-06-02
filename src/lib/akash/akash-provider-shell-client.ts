@@ -9,6 +9,7 @@ import {
   isLocalhostProxyUrl,
   normalizeProxyWsUrl,
   resolveProxyWsFromEnv,
+  wakeAkashProviderProxy,
 } from "@/lib/akash/akash-provider-proxy-url";
 import { apiUrl } from "@/lib/api-base";
 import { normalizeProviderHostUri } from "@/lib/akash/provider-host-uri";
@@ -87,78 +88,108 @@ export class AkashLeaseShellSession {
     },
   ) {}
 
-  connect(): void {
-    const shellUrl = buildProviderShellUrl(this.input);
-    const ws = new WebSocket(this.input.proxyWsUrl);
-    this.ws = ws;
-    let opened = false;
+  connect(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const shellUrl = buildProviderShellUrl(this.input);
+      const ws = new WebSocket(this.input.proxyWsUrl);
+      this.ws = ws;
+      let opened = false;
 
-    ws.onopen = () => {
-      opened = true;
-      ws.send(
-        JSON.stringify({
-          type: "websocket",
-          url: shellUrl,
-          auth: { type: "jwt", token: this.input.jwt },
-          providerAddress: this.input.provider,
-          isBase64: true,
-        }),
-      );
-      while (this.queue.length) {
-        this.send(this.queue.shift()!);
-      }
-      this.pingTimer = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "ping" }));
-        }
-      }, 30_000);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const json = JSON.parse(String(event.data)) as AkashShellMessage & { type?: string };
-        if (json.type === "pong") return;
-        if (json.error) {
-          this.input.onError(json.error);
-          return;
-        }
-        if (json.closed) {
-          this.input.onClose();
-          return;
-        }
-        const data = json.message?.data;
-        if (!data?.length) return;
-        const code = data[0] as LeaseShellCode;
-        const text = new TextDecoder().decode(Uint8Array.from(data.slice(1)));
-        if (code === LeaseShellCode.Stdout || code === LeaseShellCode.Stderr) {
-          this.input.onData(text, code);
-        } else if (code === LeaseShellCode.Failure) {
-          this.input.onError(text || "Shell session failed.");
-        }
-      } catch {
-        /* ignore malformed frames */
-      }
-    };
-
-    ws.onerror = () => {
-      /* onclose usually follows with a code */
-    };
-
-    ws.onclose = (ev) => {
-      if (this.pingTimer) clearInterval(this.pingTimer);
-      if (!opened) {
-        const hint =
-          ev.code === 1006
-            ? " (proxy unreachable, sleeping on Render free tier, or wrong wss:// URL on Netlify)"
-            : ev.code === 1008
-              ? " (origin blocked — set AKASH_PROVIDER_PROXY_ORIGINS on Render)"
-              : "";
-        this.input.onError(
-          `WebSocket to provider proxy failed (code ${ev.code || "unknown"})${hint}. URL: ${this.input.proxyWsUrl}`,
+      ws.onopen = () => {
+        opened = true;
+        ws.send(
+          JSON.stringify({
+            type: "websocket",
+            url: shellUrl,
+            auth: { type: "jwt", token: this.input.jwt },
+            providerAddress: this.input.provider,
+            isBase64: true,
+          }),
         );
+        while (this.queue.length) {
+          this.send(this.queue.shift()!);
+        }
+        this.pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "ping" }));
+          }
+        }, 30_000);
+        resolve(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const json = JSON.parse(String(event.data)) as AkashShellMessage & { type?: string };
+          if (json.type === "pong") return;
+          if (json.error) {
+            this.input.onError(json.error);
+            return;
+          }
+          if (json.closed) {
+            this.input.onClose();
+            return;
+          }
+          const data = json.message?.data;
+          if (!data?.length) return;
+          const code = data[0] as LeaseShellCode;
+          const text = new TextDecoder().decode(Uint8Array.from(data.slice(1)));
+          if (code === LeaseShellCode.Stdout || code === LeaseShellCode.Stderr) {
+            this.input.onData(text, code);
+          } else if (code === LeaseShellCode.Failure) {
+            this.input.onError(text || "Shell session failed.");
+          }
+        } catch {
+          /* ignore malformed frames */
+        }
+      };
+
+      ws.onerror = () => {
+        /* onclose follows */
+      };
+
+      ws.onclose = (ev) => {
+        if (this.pingTimer) clearInterval(this.pingTimer);
+        if (!opened) {
+          const hint =
+            ev.code === 1006
+              ? " — open https://nodeshare-akash-proxy.onrender.com/health, wait for {\"ok\":true}, then Reconnect"
+              : ev.code === 1008
+                ? " (origin blocked on Render — redeploy proxy)"
+                : "";
+          this.input.onError(
+            `WebSocket to provider proxy failed (code ${ev.code || "unknown"})${hint}. URL: ${this.input.proxyWsUrl}`,
+          );
+          resolve(false);
+          return;
+        }
+        this.input.onClose();
+      };
+    });
+  }
+
+  /** Wake Render free tier, then retry WebSocket until connected. */
+  static async connectWithWake(
+    input: ConstructorParameters<typeof AkashLeaseShellSession>[0] & {
+      onStatus?: (message: string) => void;
+    },
+  ): Promise<AkashLeaseShellSession> {
+    const { onStatus, ...sessionInput } = input;
+    onStatus?.("Starting Render proxy (free tier can take up to 90s)…");
+    await wakeAkashProviderProxy(sessionInput.proxyWsUrl, onStatus);
+
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      onStatus?.(`Opening terminal WebSocket (${attempt}/4)…`);
+      const session = new AkashLeaseShellSession(sessionInput);
+      const ok = await session.connect();
+      if (ok) return session;
+      session.disconnect();
+      if (attempt < 4) {
+        onStatus?.("Retrying in 5s…");
+        await new Promise((r) => setTimeout(r, 5000));
+        await wakeAkashProviderProxy(sessionInput.proxyWsUrl);
       }
-      this.input.onClose();
-    };
+    }
+    throw new Error("Could not connect to provider proxy after retries.");
   }
 
   send(data: Uint8Array): void {
