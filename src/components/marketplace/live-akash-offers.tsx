@@ -3,11 +3,18 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { GpuOfferPreview } from "@/components/gpu/gpu-offer-preview";
 import { AkashMarketTrustBar } from "@/components/marketplace/akash-market-trust-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchApiJson } from "@/lib/fetch-api";
 import { ordersToOfferCards, type OfferCard } from "@/lib/akash/summarize";
+import { isGenericGpuLabel } from "@/lib/akash/gpu-models";
+import { useAkashGpuCatalog } from "@/hooks/use-akash-gpu-catalog";
+import { useGpuBackendStatus } from "@/hooks/use-gpu-backend-status";
+import { gpuLabelToModelSlug } from "@/lib/akash/gpu-reference-pricing";
+import { buildCheckoutSearchParams, PAYMENT_ASSET } from "@/lib/gpu/quote-utils";
+import { resolveBackendOffer } from "@/lib/gpu/resolve-backend-offer";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -16,6 +23,8 @@ type Props = {
   offerQueryParam?: boolean;
   limit?: number;
   showSource?: boolean;
+  /** Hide generic "open model bid" LCD cards (Console catalog is primary). */
+  namedGpuOnly?: boolean;
 };
 
 function OfferSkeleton() {
@@ -33,31 +42,18 @@ function OfferSkeleton() {
   );
 }
 
-function ResourceChip({ label, highlight }: { label: string; highlight?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-        highlight
-          ? "border-accent/25 bg-accent-muted text-accent"
-          : "border-border-subtle bg-surface-base text-text-secondary",
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
 function OfferCardView({
   o,
   href,
   reserveLabel,
   index,
+  rentHint,
 }: {
   o: OfferCard;
   href: string;
   reserveLabel: string;
   index: number;
+  rentHint?: string;
 }) {
   return (
     <motion.div
@@ -92,19 +88,26 @@ function OfferCardView({
           </div>
 
           <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
-            <h3 className="text-base font-semibold leading-snug tracking-tight text-text-primary">
-              {o.title}
-            </h3>
+            <GpuOfferPreview
+              gpuModel={o.gpuModel || o.title}
+              title={o.title}
+              resourceChips={o.resourceChips}
+              hasGpu={o.hasGpu}
+              provider={o.provider}
+              region="Global"
+              orderRef={undefined}
+              priceHourly={o.priceHourly}
+              className="mb-4"
+            />
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {o.resourceChips.map((chip, idx) => (
-                <ResourceChip
-                  key={`${o.id}-${chip}-${idx}`}
-                  label={chip}
-                  highlight={chip.includes("GPU") || chip.includes("NVIDIA") || chip.includes("AMD")}
-                />
-              ))}
-            </div>
+            {o.providerGpuInventory && o.providerGpuInventory !== o.gpuModel ? (
+              <p className="mb-3 text-[11px] text-text-secondary">
+                <span className="font-semibold text-text-primary">Provider inventory:</span>{" "}
+                {o.providerGpuInventory}
+              </p>
+            ) : null}
+
+            <h3 className="sr-only">{o.gpuModel || o.title}</h3>
 
             <div className="mt-5 rounded-lg border border-border-subtle bg-surface-base/80 px-3 py-3">
               {o.priceHourly ? (
@@ -129,6 +132,9 @@ function OfferCardView({
 
             <p className="mt-3 font-mono text-[10px] text-text-muted">{o.orderRef}</p>
 
+            {rentHint ? (
+              <p className="mt-3 text-[11px] text-text-muted">{rentHint}</p>
+            ) : null}
             <Button className="mt-4 w-full" asChild>
               <Link href={href}>{reserveLabel}</Link>
             </Button>
@@ -145,7 +151,10 @@ export function LiveAkashOffers({
   offerQueryParam = false,
   limit = 12,
   showSource = false,
+  namedGpuOnly = false,
 }: Props) {
+  const { configured: backendConfigured } = useGpuBackendStatus();
+  const catalog = useAkashGpuCatalog({ enabled: backendConfigured });
   const [cards, setCards] = useState<OfferCard[]>([]);
   const [source, setSource] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -162,6 +171,7 @@ export function LiveAkashOffers({
           orders?: unknown[];
           source?: string;
           attempts?: string[];
+          providersByOwner?: Record<string, { vendor: string; model: string; ram?: string }[]>;
         };
         error?: string;
       }>(`/api/akash/market?limit=${limit}`);
@@ -186,8 +196,15 @@ export function LiveAkashOffers({
       }
 
       const orders = Array.isArray(j.data?.orders) ? j.data!.orders : [];
+      const providersByOwner = j.data?.providersByOwner ?? {};
+      let nextCards = ordersToOfferCards(orders, limit, providersByOwner);
+      if (namedGpuOnly) {
+        nextCards = nextCards.filter(
+          (c) => c.hasGpu && c.gpuModel && !isGenericGpuLabel(c.gpuModel),
+        );
+      }
       setSource(j.data?.source ?? null);
-      setCards(ordersToOfferCards(orders, limit));
+      setCards(nextCards);
       setUpdatedAt(Date.now());
       setErr(null);
     } catch (e) {
@@ -197,7 +214,7 @@ export function LiveAkashOffers({
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, namedGpuOnly]);
 
   useEffect(() => {
     void load();
@@ -205,8 +222,22 @@ export function LiveAkashOffers({
     return () => window.clearInterval(id);
   }, [load]);
 
+  if (namedGpuOnly && !loading && !err && cards.length === 0) {
+    return null;
+  }
+
   return (
     <motion.div className="space-y-4">
+      <div className="rounded-xl border border-border-subtle bg-white px-4 py-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+          LCD spot bids {namedGpuOnly ? "(named GPUs only)" : ""}
+        </p>
+        <p className="mt-1 text-sm text-text-secondary">
+          {namedGpuOnly
+            ? "Optional: open Akash LCD orders that already name a specific GPU model. Most renters should use the GPU catalog above."
+            : "Open spot bids from the Akash mainnet LCD."}
+        </p>
+      </div>
       <AkashMarketTrustBar orderCount={loading ? undefined : cards.length} />
 
       {loading ? (
@@ -246,7 +277,8 @@ export function LiveAkashOffers({
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
             <span>
-              {cards.length} live open order{cards.length === 1 ? "" : "s"} · prices from Akash mainnet LCD
+              {cards.length} live open order{cards.length === 1 ? "" : "s"} · GPU model from bid or provider
+              inventory (Akash Console API)
             </span>
             <div className="flex items-center gap-3">
               {updatedAt ? (
@@ -270,9 +302,49 @@ export function LiveAkashOffers({
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {cards.map((o, i) => {
+              const resolved =
+                backendConfigured && !catalog.loading
+                  ? resolveBackendOffer({
+                      requestedId: o.id,
+                      backendOffers: catalog.offers,
+                      gpuLabel: o.gpuModel || o.title,
+                    })
+                  : null;
+
+              const catalogOfferId =
+                resolved?.ok && offerQueryParam ? resolved.checkoutOfferId : o.id;
+
+              const gpuLabel = o.gpuModel || o.title;
+              const gpuSlug = gpuLabelToModelSlug(gpuLabel) || undefined;
               const href = offerQueryParam
-                ? `${reserveHref}?offer=${encodeURIComponent(o.id)}`
+                ? `${reserveHref}?${buildCheckoutSearchParams({
+                    offerId: catalogOfferId,
+                    title: o.title,
+                    provider: o.provider,
+                    basePriceAkt: o.basePriceAkt,
+                    basePriceUsd: o.basePriceUsd,
+                    gpuLabel,
+                    gpuModelSlug: gpuSlug,
+                    lcdOrderId: o.id,
+                    providerOwner: o.providerOwner,
+                    providerOnline: true,
+                    gpuHasCapacity: true,
+                    fastRentEligible: true,
+                    priceHourly: o.priceHourly,
+                    pricePerBlock: o.price,
+                    lcdPriceAmount: o.priceAmount,
+                    lcdPriceDenom: o.priceDenom,
+                  })}`
                 : reserveHref;
+
+              const rentHint = namedGpuOnly
+                ? `Direct Akash rent · ${o.gpuModel}`
+                : resolved?.ok && backendConfigured
+                  ? `Pay ${PAYMENT_ASSET} from your NodeShare wallet · catalog ${resolved.checkoutOfferId.split(":").pop()} · LCD ${o.id}`
+                  : backendConfigured
+                    ? `One-click AKT checkout when quote loads · LCD bid ${o.id}`
+                    : `Direct Akash rent · provider ${o.providerOwner?.slice(0, 12) ?? ""}…`;
+
               return (
                 <OfferCardView
                   key={o.id}
@@ -280,6 +352,7 @@ export function LiveAkashOffers({
                   href={href}
                   reserveLabel={reserveLabel}
                   index={i}
+                  rentHint={rentHint}
                 />
               );
             })}

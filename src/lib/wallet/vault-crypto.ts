@@ -11,7 +11,14 @@ function toB64(buf: Uint8Array): string {
 }
 
 function fromB64(s: string): Uint8Array {
-  const bin = atob(s);
+  const normalized = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  let bin: string;
+  try {
+    bin = atob(normalized + pad);
+  } catch {
+    throw new Error("Wallet vault data is corrupted — re-import your recovery phrase in Settings.");
+  }
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;

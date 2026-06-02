@@ -95,6 +95,16 @@ const checks = [
     label: "Akash LCD override (optional)",
     required: false,
   },
+  {
+    key: "GPU_BACKEND_URL",
+    label: "GPU marketplace backend (optional — USDC checkout)",
+    required: false,
+  },
+  {
+    key: "GPU_API_KEY",
+    label: "GPU marketplace API key (optional)",
+    required: false,
+  },
 ];
 
 let failed = false;

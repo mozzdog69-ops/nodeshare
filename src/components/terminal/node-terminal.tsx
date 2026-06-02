@@ -5,7 +5,7 @@ import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef } from "react";
 
 const WELCOME = [
-  "\r\n\x1b[38;2;251;113;133m● NodeShare\x1b[0m — decentralized AI compute shell",
+  "\r\n\x1b[38;2;251;113;133m● NodeShare\x1b[0m — Akash-native shell (AKT on-chain, live LCD)",
   "\r\n\x1b[38;2;100;116;139mTry:\x1b[0m  run stable-diffusion --gpu 1",
   "        deploy model llama-3",
   "        rent gpu 2h",

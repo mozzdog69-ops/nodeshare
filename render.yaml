@@ -1,0 +1,15 @@
+# Deploy free Akash provider proxy on Render (https://render.com)
+# Dashboard → New → Blueprint → connect this repo, or New → Web Service manually.
+services:
+  - type: web
+    name: nodeshare-akash-proxy
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node scripts/akash-provider-proxy.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: AKASH_PROVIDER_PROXY_ORIGINS
+        value: https://nodesharev1.netlify.app
+      - key: NODE_VERSION
+        value: "22"

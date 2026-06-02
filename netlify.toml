@@ -1,11 +1,17 @@
 # Full Next.js (App Router + /api/*) on Netlify — optional IPFS static front (see IPFS_ENS.md).
 # https://docs.netlify.com/frameworks/next-js/overview/
 #
-# Netlify UI: Site → Environment variables (same keys as .env.example).
+# Deploy: npm run deploy:netlify   (do NOT use --dir build; Next.js output is .next)
+# Netlify UI → Build settings → Publish directory must be empty or ".next" (not "build").
 # IPFS export: set NEXT_PUBLIC_API_BASE=https://YOUR_SITE.netlify.app (no slash).
 
 [build]
   command = "npm run build"
+  # Override Netlify UI publish path; required for @netlify/plugin-nextjs on Windows.
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -15,5 +21,5 @@
   for = "/api/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Methods = "GET, POST, PUT, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"

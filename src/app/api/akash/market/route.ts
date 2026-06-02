@@ -1,3 +1,4 @@
+import { fetchConsoleProvidersByOwner } from "@/lib/akash/fetch-console-providers";
 import {
   AKASH_FETCH_HEADERS,
   AKASH_FETCH_TIMEOUT_MS,
@@ -78,11 +79,16 @@ export async function GET(req: Request) {
     for (const base of bases) {
       const got = await fetchOrdersFrom(base, ver, limit);
       if (got.ok) {
+        const { providersByOwner, source: consoleSource, error: consoleErr } =
+          await fetchConsoleProvidersByOwner();
         return NextResponse.json({
           ok: true,
           data: {
             source: got.source,
             orders: got.orders,
+            providersByOwner,
+            consoleSource,
+            consoleError: consoleErr ?? null,
           },
         });
       }

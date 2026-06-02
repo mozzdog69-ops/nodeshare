@@ -50,17 +50,24 @@ export async function GET(req: Request) {
       };
       const balances = json.balances ?? [];
       const uakt = balances.find((b) => b.denom === "uakt");
+      const uact = balances.find((b) => b.denom === "uact");
       const raw = uakt?.amount ?? "0";
+      const rawAct = uact?.amount ?? "0";
       const akt = Number(raw) / 1_000_000;
+      const act = Number(rawAct) / 1_000_000;
       return NextResponse.json({
         ok: true,
         data: {
           source: url,
           denom: "AKT",
           uakt: raw,
+          uact: rawAct,
           aktFormatted: Number.isFinite(akt)
             ? akt.toLocaleString(undefined, { maximumFractionDigits: 6 })
             : raw,
+          actFormatted: Number.isFinite(act)
+            ? act.toLocaleString(undefined, { maximumFractionDigits: 4 })
+            : rawAct,
         },
       });
     } catch (e) {

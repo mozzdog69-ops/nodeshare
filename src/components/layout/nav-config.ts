@@ -2,6 +2,8 @@
 export const APP_NAV_ITEMS = [
   { href: "/app/dashboard", label: "Dashboard" },
   { href: "/app/marketplace", label: "Marketplace" },
+  { href: "/app/gpu/jobs", label: "GPU Jobs" },
+  { href: "/app/gpu/stuck-orders", label: "Stuck orders" },
   { href: "/app/terminal", label: "Terminal" },
   { href: "/app/wallet", label: "Wallet" },
   { href: "/app/network", label: "Compute Nodes" },

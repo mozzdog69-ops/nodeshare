@@ -1,56 +1,53 @@
 "use client";
 
 import { fetchApiJson } from "@/lib/fetch-api";
-import { useWalletSession } from "@/context/wallet-session";
+import { formatAktDisplay } from "@/lib/gpu/quote-utils";
+import { useLiveAktBalance } from "@/hooks/use-live-akt-balance";
 import { useCallback, useEffect, useState } from "react";
 import { StatRow } from "@/components/dashboard/stat-row";
 
 export function DashboardLiveStats() {
-  const { ethAddress } = useWalletSession();
-  const [orders, setOrders] = useState<number | null>(null);
-  const [stableUsd, setStableUsd] = useState<string | null>(null);
-  const [meshHint, setMeshHint] = useState<string>("");
+  const { aktBalance, aktFormatted, loading: aktLoading, walletReady } = useLiveAktBalance();
+  const [gpuBids, setGpuBids] = useState<number | null>(null);
+  const [providersWithGpu, setProvidersWithGpu] = useState<number | null>(null);
+  const [meshHint, setMeshHint] = useState("");
 
   const load = useCallback(async () => {
-    const [mGot, balGot] = await Promise.all([
-      fetchApiJson<{
-        ok: boolean;
-        data?: { orders?: unknown[] };
-        error?: string;
-      }>("/api/akash/market?limit=40"),
-      ethAddress
-        ? fetchApiJson<{
-            ok: boolean;
-            data?: { usdc?: { balance?: string }; usdt?: { balance?: string } };
-          }>(`/api/chain/balances?address=${encodeURIComponent(ethAddress)}`)
-        : Promise.resolve(null as Awaited<ReturnType<typeof fetchApiJson>> | null),
-    ]);
+    const mGot = await fetchApiJson<{
+      ok: boolean;
+      data?: {
+        orders?: unknown[];
+        providersByOwner?: Record<string, unknown>;
+      };
+      error?: string;
+    }>("/api/akash/market?limit=40");
 
     if (!mGot.ok) {
-      setOrders(0);
+      setGpuBids(0);
+      setProvidersWithGpu(0);
       setMeshHint(mGot.error);
-    } else {
-      const mj = mGot.body;
-      const count = mj.ok && mj.data?.orders ? mj.data.orders.length : 0;
-      setOrders(mj.ok ? count : 0);
-      setMeshHint(
-        mj.ok
-          ? `Open orders (state=open) · LCD page limit`
-          : (mj.error ?? "Akash market request failed"),
-      );
+      return;
     }
 
-    if (balGot?.ok) {
-      const bj = balGot.body as {
-        ok: boolean;
-        data?: { usdc?: { balance?: string }; usdt?: { balance?: string } };
-      };
-      if (bj.ok && bj.data) {
-        const u = Number(bj.data.usdc?.balance ?? 0) + Number(bj.data.usdt?.balance ?? 0);
-        setStableUsd(u.toLocaleString(undefined, { maximumFractionDigits: 2 }));
-      }
+    const mj = mGot.body;
+    if (!mj.ok) {
+      setGpuBids(0);
+      setProvidersWithGpu(0);
+      setMeshHint(mj.error ?? "Akash market request failed");
+      return;
     }
-  }, [ethAddress]);
+
+    const orders = mj.data?.orders ?? [];
+    const providers = mj.data?.providersByOwner ?? {};
+    const gpuCount = orders.length;
+    setGpuBids(gpuCount);
+    setProvidersWithGpu(Object.keys(providers).length);
+    setMeshHint(
+      gpuCount > 0
+        ? `${gpuCount} open bids · ${Object.keys(providers).length} hosts with known GPU models`
+        : "Quiet market snapshot",
+    );
+  }, []);
 
   useEffect(() => {
     void load();
@@ -60,18 +57,19 @@ export function DashboardLiveStats() {
 
   const stats = [
     {
-      label: "Open Akash bids",
-      value: orders === null ? "…" : String(orders ?? 0),
-      hint: "LCD market orders (current page)",
+      label: "Your AKT (NodeShare wallet)",
+      value:
+        !walletReady ? "—" : aktLoading ? "…" : aktFormatted ?? formatAktDisplay(aktBalance ?? 0),
+      hint: walletReady ? "Live Akash LCD · used for GPU checkout" : "Unlock wallet",
     },
     {
-      label: "Stable liquidity (USDC+USDT)",
-      value: stableUsd === null ? "—" : `$${stableUsd}`,
-      hint: ethAddress ? "Your wallet on Ethereum" : "Unlock wallet",
+      label: "Open Akash GPU bids",
+      value: gpuBids === null ? "…" : String(gpuBids),
+      hint: "LCD market · models from Console API",
     },
     {
-      label: "Mesh snapshot",
-      value: orders === null ? "…" : orders > 0 ? "Live" : "Quiet",
+      label: "Providers with GPU inventory",
+      value: providersWithGpu === null ? "…" : String(providersWithGpu),
       hint: meshHint,
     },
   ];

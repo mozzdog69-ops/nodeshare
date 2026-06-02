@@ -7,6 +7,12 @@ export const AKASH_BLOCKS_PER_MONTH = Math.floor((30 * 24 * 3600) / AKASH_AVG_BL
 export const AKASH_IBC_USDC =
   "ibc/170c677610ac31df0904ffe09cd3b5c657492170e7e52372e48756b71e56f2f1";
 
+/**
+ * Scale factor from LCD `order.spec.resources[].price.amount` (Cosmos `Dec` string) to whole USDC.
+ * This is not the token micro-unit (1e6): open-order amounts align with public /hr spot rates only after /1e8.
+ */
+export const AKASH_IBC_USDC_AMOUNT_DIVISOR = 100_000_000;
+
 export function isUsdcIbcDenom(denom: string): boolean {
   return denom.toLowerCase() === AKASH_IBC_USDC;
 }
@@ -58,7 +64,7 @@ export function formatAkashPrice(amount: string, denom: string): FormattedPrice 
   }
 
   if (isUsdcIbcDenom(denom)) {
-    const perBlock = n / 1_000_000;
+    const perBlock = n / AKASH_IBC_USDC_AMOUNT_DIVISOR;
     const hourly = perBlock * AKASH_BLOCKS_PER_HOUR;
     const monthly = perBlock * AKASH_BLOCKS_PER_MONTH;
     return {

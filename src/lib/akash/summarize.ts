@@ -1,4 +1,15 @@
+import {
+  formatGpuModelName,
+  formatProviderGpuInventory,
+  formatProviderGpuModel,
+  formatVendorLabel,
+  isGenericGpuLabel,
+  labelFromGpuAttributeKey,
+  resolveOfferGpuHeadline,
+  type ProviderGpuModel,
+} from "@/lib/akash/gpu-models";
 import { formatAkashPrice } from "@/lib/akash/pricing";
+import { parseHourlyAkt, parseHourlyUsd } from "@/lib/gpu/quote-utils";
 
 export type MapNode = {
   id: string;
@@ -25,6 +36,17 @@ export type OfferCard = {
   state: string;
   orderRef: string;
   hasGpu: boolean;
+  provider: string;
+  /** Full akash1… owner when parsed from LCD order id */
+  providerOwner?: string;
+  basePriceUsd: number | null;
+  basePriceAkt: number | null;
+  gpuModel: string | null;
+  /** Full provider GPU list from Akash Console when bid is open/generic */
+  providerGpuInventory: string | null;
+  /** Raw chain price.amount from LCD order (for SDL bid matching). */
+  priceAmount?: string;
+  priceDenom?: string;
 };
 
 type ParsedResource = {
@@ -36,6 +58,8 @@ type ParsedResource = {
   priceNote: string;
   priceHourly: string | null;
   priceMonthly: string | null;
+  priceAmount?: string;
+  priceDenom?: string;
 };
 
 function hashToXY(id: string): { x: number; y: number } {
@@ -92,26 +116,24 @@ function gpuFromAttributes(attrs: unknown): string {
     const o = a as { key?: string; value?: string };
     const key = (o.key ?? "").trim();
     const val = (o.value ?? "").trim();
-    const keyL = key.toLowerCase();
-
-    const modelInKey = key.match(/model\/([^/]+)/i)?.[1];
-    if (modelInKey) {
-      if (modelInKey === "*" || modelInKey === "any") return "NVIDIA GPU (any model)";
-      return `NVIDIA ${modelInKey.replace(/\*/g, "").trim()}`;
-    }
-
-    if (keyL.includes("vendor/nvidia") || keyL.includes("nvidia")) {
-      if (val && val !== "true" && !/^\*+$/.test(val)) return `NVIDIA ${val}`;
-      return "NVIDIA GPU";
-    }
-    if (keyL.includes("vendor/amd") || keyL.includes("amd")) return "AMD GPU";
+    const fromKey = labelFromGpuAttributeKey(key, val);
+    if (fromKey) return fromKey;
 
     const blob = `${key} ${val}`;
     const named =
-      blob.match(/\b(A100|A10|H100|L40S?|RTX\s*\d+|Tesla\s*\w+|MI250)\b/i)?.[0];
-    if (named) return `NVIDIA ${named}`;
+      blob.match(/\b(A100|A10|H100|L40S?|RTX\s*\d+\s*Ti?|Tesla\s*\w+|MI250|4090|3090|4080)\b/i)?.[0];
+    if (named) return `NVIDIA ${named.replace(/\s+/g, " ").trim()}`;
   }
   return "";
+}
+
+function resolveGpuLabel(
+  attrs: unknown,
+  providerModels?: ProviderGpuModel[],
+): string {
+  const fromBid = gpuFromAttributes(attrs);
+  const { headline } = resolveOfferGpuHeadline(fromBid, providerModels);
+  return headline;
 }
 
 function shortenAkashAddr(addr: string): string {
@@ -119,7 +141,11 @@ function shortenAkashAddr(addr: string): string {
   return `${addr.slice(0, 10)}…${addr.slice(-4)}`;
 }
 
-function parseResourceGroup(entry: unknown): ParsedResource | null {
+function parseResourceGroup(
+  entry: unknown,
+  providerOwner: string,
+  providersByOwner?: Record<string, ProviderGpuModel[]>,
+): ParsedResource | null {
   if (!entry || typeof entry !== "object") return null;
   const o = entry as Record<string, unknown>;
   const resource = o.resource;
@@ -143,7 +169,9 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
   if (r.gpu && typeof r.gpu === "object") {
     const g = r.gpu as { units?: unknown; attributes?: unknown };
     const units = readUnits(g.units);
-    const label = gpuFromAttributes(g.attributes);
+    const ownerKey = providerOwner.trim().toLowerCase();
+    const providerModels = ownerKey ? providersByOwner?.[ownerKey] : undefined;
+    const label = resolveGpuLabel(g.attributes, providerModels);
     if (label) gpu = units != null && units > 1 ? `${label} ×${units}` : label;
     else if (units != null && units > 0) gpu = `${units} GPU`;
   }
@@ -152,9 +180,13 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
   let priceNote = "";
   let priceHourly: string | null = null;
   let priceMonthly: string | null = null;
+  let priceAmount: string | undefined;
+  let priceDenom: string | undefined;
   if (o.price && typeof o.price === "object") {
     const p = o.price as { amount?: string; denom?: string };
     if (p.amount && p.denom) {
+      priceAmount = String(p.amount);
+      priceDenom = String(p.denom);
       const fmt = formatAkashPrice(p.amount, p.denom);
       price = fmt.perBlock;
       priceNote = fmt.note;
@@ -172,15 +204,26 @@ function parseResourceGroup(entry: unknown): ParsedResource | null {
     priceNote,
     priceHourly,
     priceMonthly,
+    priceAmount,
+    priceDenom,
   };
 }
 
-function parseOrder(raw: unknown): {
+/** @deprecated SDL signedBy lists auditors, not providers — do not use for provider targeting. */
+function readTargetProvider(_spec: unknown): string {
+  return "";
+}
+
+function parseOrder(
+  raw: unknown,
+  providersByOwner?: Record<string, ProviderGpuModel[]>,
+): {
   id: string;
   state: string;
   title: string;
   orderRef: string;
   provider: string;
+  providerOwner: string;
   resource: ParsedResource;
 } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -189,14 +232,12 @@ function parseOrder(raw: unknown): {
   let id = "";
   let orderRef = "";
   let provider = "";
+  let providerOwner = "";
   if (o.id && typeof o.id === "object") {
     const I = o.id as Record<string, unknown>;
     const dseq = String(I.dseq ?? "");
     const gseq = I.gseq;
     const oseq = I.oseq;
-    if (typeof I.owner === "string" && I.owner) {
-      provider = shortenAkashAddr(I.owner);
-    }
     orderRef = dseq ? `dseq ${dseq}` : "";
     if (typeof gseq === "number" && typeof oseq === "number") {
       id = `${dseq}-${gseq}-${oseq}`;
@@ -213,10 +254,17 @@ function parseOrder(raw: unknown): {
   if (spec && typeof spec === "object") {
     const name = (spec as { name?: string }).name;
     if (name && name.trim()) rawName = name.trim();
+    const target = readTargetProvider(spec);
+    if (target) {
+      providerOwner = target;
+      provider = shortenAkashAddr(target);
+    }
   }
 
   const resources = spec && typeof spec === "object" ? (spec as { resources?: unknown }).resources : null;
-  const first = Array.isArray(resources) ? parseResourceGroup(resources[0]) : null;
+  const first = Array.isArray(resources)
+    ? parseResourceGroup(resources[0], providerOwner, providersByOwner)
+    : null;
   const resource: ParsedResource = first ?? {
     cpu: "",
     memory: "",
@@ -230,7 +278,7 @@ function parseOrder(raw: unknown): {
 
   const title = displayTitle(rawName, resource, orderRef);
 
-  return { id, state, title, orderRef, provider, resource };
+  return { id, state, title, orderRef, provider, providerOwner, resource };
 }
 
 function resourceSummary(r: ParsedResource): string {
@@ -238,8 +286,16 @@ function resourceSummary(r: ParsedResource): string {
   return parts.length ? parts.join(" · ") : "Compute (see order spec)";
 }
 
-function resourceChips(r: ParsedResource): string[] {
-  return [r.gpu, r.cpu, r.memory, r.storage].filter(Boolean);
+function resourceChips(r: ParsedResource, gpuHeadline: string | null): string[] {
+  const chips = [r.gpu, r.cpu, r.memory, r.storage].filter(Boolean);
+  if (!gpuHeadline) return chips.length ? chips : ["Compute"];
+  return chips.filter(
+    (c) =>
+      c !== gpuHeadline &&
+      !isGenericGpuLabel(c) &&
+      !/^NVIDIA GPU$/i.test(c) &&
+      !/NVIDIA GPU \(any model\)/i.test(c),
+  );
 }
 
 function displayTitle(
@@ -251,8 +307,9 @@ function displayTitle(
   const generic =
     !rawName.trim() || /^akash$/i.test(rawName.trim()) || rawName.trim().length < 3;
   if (!generic) return rawName.trim();
+  if (r.gpu && !isGenericGpuLabel(r.gpu)) return r.gpu;
   if (dseq) return `Spot bid · dseq ${dseq}`;
-  if (r.gpu) return "GPU spot bid";
+  if (r.gpu) return r.gpu;
   const summary = resourceSummary(r);
   if (summary !== "Compute (see order spec)") {
     return summary.split(" · ")[0] ?? "Open bid";
@@ -260,8 +317,8 @@ function displayTitle(
   return orderRef || "Akash open bid";
 }
 
-function orderId(raw: unknown, index: number): string {
-  const p = parseOrder(raw);
+function orderId(raw: unknown, index: number, providersByOwner?: Record<string, ProviderGpuModel[]>) {
+  const p = parseOrder(raw, providersByOwner);
   return p?.id ?? `akash-order-${index}`;
 }
 
@@ -271,10 +328,13 @@ function latencyFromId(id: string): string {
   return `${18 + (n % 55)} ms (est.)`;
 }
 
-export function ordersToMapNodes(orders: unknown[]): MapNode[] {
+export function ordersToMapNodes(
+  orders: unknown[],
+  providersByOwner?: Record<string, ProviderGpuModel[]>,
+): MapNode[] {
   return orders.map((raw, i) => {
-    const p = parseOrder(raw);
-    const id = p?.id ?? orderId(raw, i);
+    const p = parseOrder(raw, providersByOwner);
+    const id = p?.id ?? orderId(raw, i, providersByOwner);
     const { x, y } = hashToXY(id);
     const r = p?.resource;
     return {
@@ -291,16 +351,30 @@ export function ordersToMapNodes(orders: unknown[]): MapNode[] {
   });
 }
 
-export function ordersToOfferCards(orders: unknown[], limit: number): OfferCard[] {
+export function ordersToOfferCards(
+  orders: unknown[],
+  limit: number,
+  providersByOwner?: Record<string, ProviderGpuModel[]>,
+): OfferCard[] {
   return orders.slice(0, limit).flatMap((raw) => {
-    const p = parseOrder(raw);
+    const p = parseOrder(raw, providersByOwner);
     if (!p) return [];
     const r = p.resource;
-    const chips = resourceChips(r);
+    const ownerKey = p.providerOwner.trim().toLowerCase();
+    const providerModels = ownerKey ? providersByOwner?.[ownerKey] : undefined;
+    const { headline: gpuModel, inventoryDetail: providerGpuInventory } = resolveOfferGpuHeadline(
+      r.gpu,
+      providerModels,
+    );
+    const title = gpuModel && !isGenericGpuLabel(gpuModel) ? gpuModel : p.title;
+    let chips = resourceChips(r, gpuModel);
+    if (gpuModel && !isGenericGpuLabel(gpuModel) && !chips.some((c) => c.includes(gpuModel.split(" · ")[0]))) {
+      chips = [gpuModel, ...chips];
+    }
     return [
       {
         id: p.id,
-        title: p.title,
+        title,
         resources: resourceSummary(r),
         resourceChips: chips.length ? chips : ["Compute"],
         price: r.price,
@@ -311,6 +385,14 @@ export function ordersToOfferCards(orders: unknown[], limit: number): OfferCard[
         state: p.state,
         orderRef: p.orderRef,
         hasGpu: Boolean(r.gpu),
+        provider: p.provider || "Akash",
+        providerOwner: p.providerOwner || undefined,
+        basePriceUsd: parseHourlyUsd(r.priceHourly),
+        basePriceAkt: parseHourlyAkt(r.priceHourly),
+        gpuModel: gpuModel || null,
+        providerGpuInventory,
+        priceAmount: r.priceAmount,
+        priceDenom: r.priceDenom,
       },
     ];
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { fetchApiJson } from "@/lib/fetch-api";
@@ -72,8 +73,21 @@ export function ComputeNetworkMap() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(225,29,72,0.06),_transparent_55%)]" />
       <div className="relative grid gap-0 lg:grid-cols-[1fr_280px]">
         <div className="relative aspect-[16/10] min-h-[320px] w-full">
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2"
+            aria-hidden
+          >
+            <Image
+              src="/nodeshare-network-mark.png"
+              alt=""
+              width={280}
+              height={280}
+              className="h-32 w-32 object-contain opacity-[0.28] sm:h-40 sm:w-40 sm:opacity-[0.32]"
+              priority
+            />
+          </div>
           <svg
-            className="absolute inset-0 h-full w-full text-accent/25"
+            className="absolute inset-0 z-0 h-full w-full text-accent/25"
             viewBox="0 0 100 100"
             preserveAspectRatio="xMidYMid meet"
             aria-hidden
@@ -132,7 +146,7 @@ export function ComputeNetworkMap() {
                 key={n.id}
                 type="button"
                 onClick={() => setSelected(n)}
-                className="absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+                className="absolute z-[2] -translate-x-1/2 -translate-y-1/2 focus:outline-none"
                 style={{ left: `${n.x}%`, top: `${n.y}%` }}
               >
                 <span className="relative flex h-4 w-4 items-center justify-center">
