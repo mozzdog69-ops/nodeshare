@@ -2,7 +2,7 @@
 
 import {
   AkashLeaseShellSession,
-  akashProviderProxyWsUrl,
+  resolveAkashProviderProxyWsUrl,
 } from "@/lib/akash/akash-provider-shell-client";
 import { LeaseShellCode } from "@/lib/akash/akash-lease-shell-codes";
 import { FitAddon } from "@xterm/addon-fit";
@@ -32,18 +32,26 @@ export function AkashLeaseShellTerminal({
   const sessionRef = useRef<AkashLeaseShellSession | null>(null);
   const [status, setStatus] = useState<"connecting" | "open" | "error" | "closed">("connecting");
   const [error, setError] = useState("");
+  const [proxyWs, setProxyWs] = useState("");
 
-  const proxyWs = akashProviderProxyWsUrl();
+  useEffect(() => {
+    let cancelled = false;
+    void resolveAkashProviderProxyWsUrl().then((url) => {
+      if (!cancelled) setProxyWs(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !proxyWs || !jwt) {
-      if (!proxyWs) {
-        setStatus("error");
-        setError(
-          "Provider proxy is not configured. Set NEXT_PUBLIC_AKASH_PROVIDER_PROXY_WS (run: node scripts/akash-provider-proxy.mjs).",
-        );
-      }
+    if (!el || !jwt) return;
+    if (!proxyWs) {
+      setStatus("error");
+      setError(
+        "Provider proxy not configured. On Netlify set AKASH_PROVIDER_PROXY_WS=wss://nodeshare-akash-proxy.onrender.com (or NEXT_PUBLIC_… and redeploy).",
+      );
       return;
     }
 
@@ -118,7 +126,8 @@ export function AkashLeaseShellTerminal({
         <p className="text-xs text-amber-800">{error}</p>
       ) : (
         <p className="text-xs text-text-secondary">
-          Live shell on your Akash GPU (dseq {dseq}). If it stays blank, use SSH below.
+          Live shell on your Akash GPU (dseq {dseq}). Proxy: {proxyWs || "…"}. If it fails, wait 60s
+          (Render free tier wake-up) or use SSH below.
         </p>
       )}
       <div

@@ -10,6 +10,6 @@ services:
     healthCheckPath: /health
     envVars:
       - key: AKASH_PROVIDER_PROXY_ORIGINS
-        value: https://nodesharev1.netlify.app
+        value: https://nodesharev1.netlify.app,https://*.netlify.app
       - key: NODE_VERSION
         value: "22"

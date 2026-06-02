@@ -4,6 +4,7 @@ import {
   encodeShellStdin,
   LeaseShellCode,
 } from "@/lib/akash/akash-lease-shell-codes";
+import { apiUrl } from "@/lib/api-base";
 import { normalizeProviderHostUri } from "@/lib/akash/provider-host-uri";
 
 export type AkashShellMessage = {
@@ -32,10 +33,31 @@ function buildProviderShellUrl(input: {
   return `${base}/lease/${input.dseq}/${input.gseq}/${input.oseq}/shell?stdin=1&tty=1&podIndex=0&${cmdQuery}&service=${encodeURIComponent(service)}`;
 }
 
+export function normalizeProxyWsUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (trimmed.startsWith("https://")) return `wss://${trimmed.slice(8)}`;
+  if (trimmed.startsWith("http://")) return `ws://${trimmed.slice(7)}`;
+  if (trimmed.startsWith("wss://") || trimmed.startsWith("ws://")) return trimmed;
+  return `wss://${trimmed}`;
+}
+
+/** Build-time proxy URL (may be stale until redeploy). */
 export function akashProviderProxyWsUrl(): string {
-  return String(process.env.NEXT_PUBLIC_AKASH_PROVIDER_PROXY_WS || "")
-    .trim()
-    .replace(/\/$/, "");
+  return normalizeProxyWsUrl(process.env.NEXT_PUBLIC_AKASH_PROVIDER_PROXY_WS || "");
+}
+
+/** Prefer server env via API so Netlify can set AKASH_PROVIDER_PROXY_WS without rebuild. */
+export async function resolveAkashProviderProxyWsUrl(): Promise<string> {
+  const baked = akashProviderProxyWsUrl();
+  try {
+    const res = await fetch(apiUrl("/api/akash/terminal/config"), { cache: "no-store" });
+    const json = (await res.json()) as { proxyWs?: string | null };
+    const fromApi = normalizeProxyWsUrl(String(json.proxyWs || ""));
+    return fromApi || baked;
+  } catch {
+    return baked;
+  }
 }
 
 export class AkashLeaseShellSession {
@@ -63,8 +85,10 @@ export class AkashLeaseShellSession {
     const shellUrl = buildProviderShellUrl(this.input);
     const ws = new WebSocket(this.input.proxyWsUrl);
     this.ws = ws;
+    let opened = false;
 
     ws.onopen = () => {
+      opened = true;
       ws.send(
         JSON.stringify({
           type: "websocket",
@@ -111,11 +135,22 @@ export class AkashLeaseShellSession {
     };
 
     ws.onerror = () => {
-      this.input.onError("WebSocket connection to provider proxy failed.");
+      /* onclose usually follows with a code */
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       if (this.pingTimer) clearInterval(this.pingTimer);
+      if (!opened) {
+        const hint =
+          ev.code === 1006
+            ? " (proxy unreachable, sleeping on Render free tier, or wrong wss:// URL on Netlify)"
+            : ev.code === 1008
+              ? " (origin blocked — set AKASH_PROVIDER_PROXY_ORIGINS on Render)"
+              : "";
+        this.input.onError(
+          `WebSocket to provider proxy failed (code ${ev.code || "unknown"})${hint}. URL: ${this.input.proxyWsUrl}`,
+        );
+      }
       this.input.onClose();
     };
   }

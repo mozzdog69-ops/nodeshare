@@ -11,7 +11,7 @@ const PORT = Number(
 );
 const ALLOWED_ORIGINS = (
   process.env.AKASH_PROVIDER_PROXY_ORIGINS ||
-  "http://localhost:3000,https://nodesharev1.netlify.app"
+  "http://localhost:3000,https://nodesharev1.netlify.app,https://*.netlify.app"
 )
   .split(",")
   .map((s) => s.trim())
@@ -19,7 +19,13 @@ const ALLOWED_ORIGINS = (
 
 function corsOk(origin) {
   if (!origin) return true;
-  return ALLOWED_ORIGINS.some((o) => origin === o || o === "*");
+  return ALLOWED_ORIGINS.some((o) => {
+    if (o === "*" || o === origin) return true;
+    if (o.includes("*.netlify.app") && /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin)) {
+      return true;
+    }
+    return false;
+  });
 }
 
 const server = http.createServer((req, res) => {
