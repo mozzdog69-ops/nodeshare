@@ -4,6 +4,12 @@ import {
   encodeShellStdin,
   LeaseShellCode,
 } from "@/lib/akash/akash-lease-shell-codes";
+import {
+  DEFAULT_AKASH_PROVIDER_PROXY_WS,
+  isLocalhostProxyUrl,
+  normalizeProxyWsUrl,
+  resolveProxyWsFromEnv,
+} from "@/lib/akash/akash-provider-proxy-url";
 import { apiUrl } from "@/lib/api-base";
 import { normalizeProviderHostUri } from "@/lib/akash/provider-host-uri";
 
@@ -33,31 +39,31 @@ function buildProviderShellUrl(input: {
   return `${base}/lease/${input.dseq}/${input.gseq}/${input.oseq}/shell?stdin=1&tty=1&podIndex=0&${cmdQuery}&service=${encodeURIComponent(service)}`;
 }
 
-export function normalizeProxyWsUrl(raw: string): string {
-  const trimmed = raw.trim().replace(/\/$/, "");
-  if (!trimmed) return "";
-  if (trimmed.startsWith("https://")) return `wss://${trimmed.slice(8)}`;
-  if (trimmed.startsWith("http://")) return `ws://${trimmed.slice(7)}`;
-  if (trimmed.startsWith("wss://") || trimmed.startsWith("ws://")) return trimmed;
-  return `wss://${trimmed}`;
-}
+export { DEFAULT_AKASH_PROVIDER_PROXY_WS, normalizeProxyWsUrl } from "@/lib/akash/akash-provider-proxy-url";
 
 /** Build-time proxy URL (may be stale until redeploy). */
 export function akashProviderProxyWsUrl(): string {
-  return normalizeProxyWsUrl(process.env.NEXT_PUBLIC_AKASH_PROVIDER_PROXY_WS || "");
+  const baked = normalizeProxyWsUrl(process.env.NEXT_PUBLIC_AKASH_PROVIDER_PROXY_WS || "");
+  if (typeof window !== "undefined") {
+    return resolveProxyWsFromEnv(baked, window.location.hostname);
+  }
+  return baked || DEFAULT_AKASH_PROVIDER_PROXY_WS;
 }
 
-/** Prefer server env via API so Netlify can set AKASH_PROVIDER_PROXY_WS without rebuild. */
+/** Prefer server API; never use localhost on Netlify. */
 export async function resolveAkashProviderProxyWsUrl(): Promise<string> {
-  const baked = akashProviderProxyWsUrl();
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
   try {
     const res = await fetch(apiUrl("/api/akash/terminal/config"), { cache: "no-store" });
     const json = (await res.json()) as { proxyWs?: string | null };
     const fromApi = normalizeProxyWsUrl(String(json.proxyWs || ""));
-    return fromApi || baked;
+    if (fromApi && !(isLocalhostProxyUrl(fromApi) && host.endsWith(".netlify.app"))) {
+      return fromApi;
+    }
   } catch {
-    return baked;
+    /* fall through */
   }
+  return akashProviderProxyWsUrl();
 }
 
 export class AkashLeaseShellSession {

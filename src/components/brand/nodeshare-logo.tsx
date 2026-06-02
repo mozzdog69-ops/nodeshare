@@ -2,11 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Vertical lockup (hex N + NODESHARE + .eth) — height-constrained, width follows aspect. */
+/** NodeShare network mark — height-constrained, square aspect in sidebar/nav. */
 const heightClass = {
-  nav: "h-9 sm:h-10",
-  sidebar: "h-10 max-w-[140px]",
-  hero: "h-16 w-auto sm:h-[4.5rem]",
+  nav: "h-9 w-9 sm:h-10 sm:w-10",
+  sidebar: "h-10 w-10",
+  hero: "h-16 w-16 sm:h-20 sm:w-20",
 } as const;
 
 export type NodeShareLogoSize = keyof typeof heightClass;
@@ -23,13 +23,19 @@ export function NodeShareLogo({
 }) {
   const img = (
     <Image
-      src="/nodeshare-logo.png"
+      src="/nodeshare-network-mark.png"
       alt="NodeShare"
-      width={200}
-      height={236}
-      sizes={size === "hero" ? "(max-width: 640px) 160px, 200px" : "140px"}
+      width={256}
+      height={256}
+      sizes={
+        size === "hero"
+          ? "(max-width: 640px) 64px, 80px"
+          : size === "sidebar"
+            ? "40px"
+            : "40px"
+      }
       className={cn(
-        "w-auto object-contain object-left",
+        "shrink-0 object-contain object-center",
         heightClass[size],
         className,
       )}
